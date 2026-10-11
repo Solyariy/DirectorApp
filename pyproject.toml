@@ -1,0 +1,16 @@
+[project]
+name = "book-store-rest-ha"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "solyariy", email = "solalex005@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "dotenv>=0.9.9",
+    "pydantic>=2.14.1",
+    "pysolarmanv5>=3.0.6",
+    "structlog>=26.1.0",
+]
+
