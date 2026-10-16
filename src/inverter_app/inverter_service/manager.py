@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from pysolarmanv5 import PySolarmanV5
 
-from src.inverter_service.settings import (
+from src.inverter_app.inverter_service.settings import (
     INVERTER_LOGGER_IP,
     INVERTER_LOGGER_SERIAL,
 )
@@ -10,13 +10,13 @@ from src.inverter_service.settings import (
 
 @dataclass
 class InverterStats:
-    pv_w: int
-    load_w: int
-    grid_w: int
-    batt_w: int
-    soc_p: float
-    batt_v: float
-    grid_v: float
+    solar_power_w: int
+    load_power_w: int
+    grid_power_w: int
+    battery_power_w: int
+    battery_charge_pct: int
+    battery_voltage_v: float
+    grid_voltage_v: float
 
 
 class InverterManager:
@@ -45,13 +45,13 @@ class InverterManager:
     def _format_registers_response(self, response) -> InverterStats:
         reg = lambda addr: self._reg(response=response, addr=addr)
         return InverterStats(
-            pv_w=reg(186) + reg(187),
-            load_w=reg(178),
-            grid_w=self._s16(reg(169)),
-            batt_w=self._s16(reg(190)),
-            soc_p=reg(184),
-            batt_v=reg(183) / 100,
-            grid_v=reg(150) / 10,
+            solar_power_w=reg(186) + reg(187),
+            load_power_w=reg(178),
+            grid_power_w=self._s16(reg(169)),
+            battery_power_w=self._s16(reg(190)),
+            battery_charge_pct=reg(184),
+            battery_voltage_v=reg(183) / 100,
+            grid_voltage_v=reg(150) / 10,
         )
 
     def read_registers(self) -> InverterStats:

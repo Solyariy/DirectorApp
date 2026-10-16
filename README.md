@@ -45,7 +45,7 @@ What the site contains (business logic):
   "count": 1, "next": null, "previous": null,
   "results": [
     {"id": 1, "ts": "2026-10-11T10:00:00Z", "solar_w": 3200, "load_w": 900,
-     "battery_pct": 82, "grid_w": 0, "source": "victron"}
+     "battery_pct": 82, "grid_w": 0}
   ]
 }
 ```
@@ -54,7 +54,7 @@ What the site contains (business logic):
 - Body:
 ```json
 {"ts": "2026-10-11T10:00:00Z", "solar_w": 3200, "load_w": 900,
- "battery_pct": 82, "grid_w": 0, "source": "victron"}
+ "battery_pct": 82, "grid_w": 0}
 ```
 - Response: `201` + the created object; `400` — invalid data (e.g. `battery_pct` outside 0–100).
 
