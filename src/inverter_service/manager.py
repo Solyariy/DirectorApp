@@ -2,7 +2,10 @@ from dataclasses import dataclass
 
 from pysolarmanv5 import PySolarmanV5
 
-from src.inverter_service.settings import INVERTER_LOGGER_IP, INVERTER_LOGGER_SERIAL
+from src.inverter_service.settings import (
+    INVERTER_LOGGER_IP,
+    INVERTER_LOGGER_SERIAL,
+)
 
 
 @dataclass
@@ -25,7 +28,7 @@ class InverterManager:
             INVERTER_LOGGER_IP,
             INVERTER_LOGGER_SERIAL,
             port=8899,
-            socket_timeout=10
+            socket_timeout=10,
         )
         return self
 
@@ -52,11 +55,13 @@ class InverterManager:
         )
 
     def read_registers(self) -> InverterStats:
-        response = self.inv.read_holding_registers(register_addr=self.BASE, quantity=self.COUNT)
+        response = self.inv.read_holding_registers(
+            register_addr=self.BASE, quantity=self.COUNT
+        )
         formatted = self._format_registers_response(response)
         return formatted
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with InverterManager() as inv:
         print(inv.read_registers())
