@@ -1,0 +1,21 @@
+$kind: http-request
+description: Returns the plain token once; stores the new id in `appId`.
+method: POST
+url: "{{baseUrl}}/apps/"
+order: 2000
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "name": "Octo"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      if (pm.response.code === 201) {
+        pm.collectionVariables.set('appId', String(pm.response.json().id));
+      }
+    language: text/javascript

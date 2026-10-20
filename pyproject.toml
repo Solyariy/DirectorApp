@@ -15,8 +15,10 @@ dependencies = [
     "djangorestframework-stubs>=3.18.1",
     "dotenv>=0.9.9",
     "markdown>=3.11.1",
+    "pvlib>=0.16.1",
     "pydantic>=2.14.1",
     "pysolarmanv5>=3.0.6",
+    "requests>=2.34.2",
     "structlog>=26.1.0",
 ]
 
@@ -42,6 +44,6 @@ docstring-quotes = "double"
 
 [tool.ruff.format]
 quote-style = "double"
-# A trailing comma keeps arguments one per line; tools/fmt.py adds it
+# A trailing comma keeps arguments one per line; ~/.local/bin/pyfmt adds it
 # wherever a declaration or call has more than two parameters.
 skip-magic-trailing-comma = false

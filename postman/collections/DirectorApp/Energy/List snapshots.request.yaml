@@ -1,0 +1,23 @@
+$kind: http-request
+description: 'Newest first, 20 per page; 400 on a malformed datetime.'
+method: GET
+url: '{{baseUrl}}/energy/snapshots/'
+order: 1000
+queryParams:
+  - key: from
+    value: '2026-10-20T00:00:00Z'
+    description: 'ISO 8601 lower bound'
+    disabled: true
+  - key: to
+    value: '2026-10-20T23:59:59Z'
+    description: 'ISO 8601 upper bound'
+    disabled: true
+  - key: page
+    value: '1'
+    description: 'Page number'
+    disabled: true
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));

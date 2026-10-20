@@ -1,0 +1,25 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/energy/snapshots/'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "timestamp": "2026-10-20T12:00:00Z",
+      "solar_power_w": 3200,
+      "load_power_w": 1100,
+      "grid_power_w": 0,
+      "battery_power_w": -1500,
+      "battery_charge_pct": 85,
+      "battery_voltage_v": 53.2,
+      "grid_voltage_v": 230.0
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));

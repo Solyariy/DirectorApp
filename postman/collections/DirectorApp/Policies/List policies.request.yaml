@@ -1,0 +1,26 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/policies/'
+order: 1000
+queryParams:
+  - key: is_active
+    value: 'true'
+    description: 'Filter by is_active (any non-empty value is truthy)'
+    disabled: true
+  - key: search
+    value: ''
+    description: 'Case-insensitive name filter'
+    disabled: true
+  - key: page
+    value: '1'
+    description: 'Page number'
+    disabled: true
+  - key: page_size
+    value: '20'
+    description: 'Page size, max 100'
+    disabled: true
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));

@@ -1,0 +1,13 @@
+$kind: http-request
+description: 'Checks the app''s policies against the latest energy snapshot; 404 when there are no snapshots.'
+method: GET
+url: '{{baseUrl}}/apps/:app_id/evaluate/'
+order: 6000
+pathVariables:
+  - key: app_id
+    value: '{{appId}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from src.inverter_app.models import EnergySnapshot
 
 

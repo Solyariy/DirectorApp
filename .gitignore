@@ -1,3 +1,5 @@
+AGENTS.md
+CLAUDE.md
 tools/
 .idea
 # Created by https://www.toptal.com/developers/gitignore/api/python
@@ -178,3 +180,6 @@ pyrightconfig.json
 *.R
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+/src/director_app/authentication.py
+/FUTURE_NOTES.md
+collector.log

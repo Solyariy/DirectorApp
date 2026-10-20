@@ -1,0 +1,3 @@
+$kind: collection
+description: 'Connections between an app and policies (director_app).'
+order: 3000

@@ -1,16 +1,10 @@
-from dataclasses import asdict
-
-from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from pysolarmanv5 import NoSocketAvailableError, V5FrameError
 from rest_framework import pagination, status, views
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from src.inverter_app.inverter_service.provider import (
-    get_inverter_manager,
-)
 from src.inverter_app.models import EnergySnapshot
+from src.inverter_app.scripts import read_latest_energy_and_save
 from src.inverter_app.serializers import EnergySnapshotSerializer
 
 
@@ -27,7 +21,11 @@ class EnergySnapshotListView(views.APIView):
             request.query_params,
         )
         paginator = SnapshotPagination()
-        page = paginator.paginate_queryset(queryset, request, view=self)
+        page = paginator.paginate_queryset(
+            queryset,
+            request,
+            view=self,
+        )
         serializer = EnergySnapshotSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
@@ -56,18 +54,11 @@ class EnergySnapshotListView(views.APIView):
 class EnergyCurrentView(views.APIView):
     def get(self, request):
         try:
-            with get_inverter_manager() as inverter:
-                stats = inverter.read_registers()
-        except (OSError, V5FrameError, NoSocketAvailableError):
+            snapshot = read_latest_energy_and_save()
+        except ConnectionError as e:
             return Response(
-                {"detail": "Inverter is unreachable."},
+                {"detail": str(e)},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        snapshot: EnergySnapshot = EnergySnapshot.objects.create(
-            timestamp=timezone.now(), **asdict(stats)
-        )
-        surplus_w = snapshot.solar_power_w - snapshot.load_power_w
         data = EnergySnapshotSerializer(snapshot).data
-        data["surplus_w"] = surplus_w
-        data["has_surplus"] = surplus_w > 0
         return Response(data)

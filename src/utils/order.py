@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from src.settings import LOG_ID

@@ -1,0 +1,3 @@
+$kind: collection
+description: 'Registered apps (director_app). Creating or rotating returns a one-time `token`.'
+order: 1000

@@ -1,0 +1,40 @@
+$kind: http-request
+method: PUT
+url: '{{baseUrl}}/policies/:policy_id/'
+order: 4000
+pathVariables:
+  - key: policy_id
+    value: '{{policyId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Daytime surplus",
+      "description": "Run jobs when solar covers the load",
+      "is_active": true,
+      "active_from": null,
+      "active_until": null,
+      "weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "time_from": "09:00",
+      "time_to": "17:00",
+      "timezone": "Europe/Kyiv",
+      "min_solar_w": 1500,
+      "surplus_threshold_w": 500,
+      "battery_floor_pct": 60,
+      "max_grid_import_w": 0,
+      "max_concurrent_jobs": 1
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));

@@ -1,7 +1,8 @@
 import functools
+import logging
 import sys
 import traceback
-import logging
+
 import structlog
 
 from src.utils.order import get_log_id
@@ -37,8 +38,12 @@ def inject_traceback(func):
     def wrapper(*args, **kwargs):
         f = sys._getframe(kwargs.get("increase_depth", 1))
         loc, line = f.f_code.co_filename, f.f_lineno
-        loc = loc[loc.find("src"):]
-        func(*args, **kwargs, msg_location=(loc, line))
+        loc = loc[loc.find("src") :]
+        func(
+            *args,
+            **kwargs,
+            msg_location=(loc, line),
+        )
 
     return wrapper
 
@@ -61,54 +66,78 @@ class Logger:
 
     @staticmethod
     @inject_traceback
-    def info(msg: str, *, msg_location: tuple[str, int], increase_depth: int = 1, event: str = "", **kwargs):
+    def info(
+        msg: str,
+        *,
+        msg_location: tuple[str, int],
+        increase_depth: int = 1,
+        event: str = "",
+        **kwargs,
+    ):
         main_logger.info(
-            event + Logger._get_caller_name(increase_depth) + str(msg_location),
+            event
+            + Logger._get_caller_name(increase_depth)
+            + str(msg_location),
             log_id=get_log_id(),
             msg=msg,
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
     @inject_traceback
-    def debug(msg: str, *, msg_location: tuple[str, int], increase_depth: int = 1, event: str = "", **kwargs):
+    def debug(
+        msg: str,
+        *,
+        msg_location: tuple[str, int],
+        increase_depth: int = 1,
+        event: str = "",
+        **kwargs,
+    ):
         main_logger.debug(
-            event + Logger._get_caller_name(increase_depth) + str(msg_location),
+            event
+            + Logger._get_caller_name(increase_depth)
+            + str(msg_location),
             log_id=get_log_id(),
             msg=msg,
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
     @inject_traceback
     def warning(
-            msg: str, *,
-            error: Exception = None,
-            msg_location: tuple[str, int] = None,
-            increase_depth: int = 1,
-            event: str = "",
-            **kwargs
+        msg: str,
+        *,
+        error: Exception = None,
+        msg_location: tuple[str, int] = None,
+        increase_depth: int = 1,
+        event: str = "",
+        **kwargs,
     ):
         main_logger.warning(
-            event + Logger._get_caller_name(increase_depth) + str(msg_location),
+            event
+            + Logger._get_caller_name(increase_depth)
+            + str(msg_location),
             log_id=get_log_id(),
             msg=msg,
             error=error,
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
     @inject_traceback
     def error(
-            msg: str, *,
-            error: Exception = None,
-            msg_location: tuple[str, int] = None,
-            increase_depth: int = 1,
-            event: str = "",
-            **kwargs
+        msg: str,
+        *,
+        error: Exception = None,
+        msg_location: tuple[str, int] = None,
+        increase_depth: int = 1,
+        event: str = "",
+        **kwargs,
     ):
         main_logger.error(
-            event + Logger._get_caller_name(increase_depth) + str(msg_location),
+            event
+            + Logger._get_caller_name(increase_depth)
+            + str(msg_location),
             log_id=get_log_id(),
             msg=msg,
             error=error,
@@ -128,7 +157,7 @@ class LoggerMixin:
             event=self._log_prefix,
             msg=msg,
             increase_depth=2,
-            **kwargs
+            **kwargs,
         )
 
     def log_warning(self, msg: str, error: Exception = None, **kwargs):
@@ -137,7 +166,7 @@ class LoggerMixin:
             msg=msg,
             error=error,
             increase_depth=2,
-            **kwargs
+            **kwargs,
         )
 
     def log_error(self, msg: str, *, error: Exception, **kwargs):
@@ -146,5 +175,5 @@ class LoggerMixin:
             msg=msg,
             error=error,
             increase_depth=2,
-            **kwargs
+            **kwargs,
         )

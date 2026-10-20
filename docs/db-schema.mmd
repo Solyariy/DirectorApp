@@ -1,0 +1,104 @@
+erDiagram
+    JOB_TYPE ||--o{ JOB : has
+    JOB ||--o{ JOB_EVENT : logs
+    REGISTERED_APP ||--o{ APP_POLICY : links
+    POLICY ||--o{ APP_POLICY : applies
+
+    JOB_TYPE {
+        int id PK
+        string name UK
+        float avg_kwh
+        int avg_duration_s
+        int runs_count
+    }
+
+    JOB {
+        int id PK
+        string name
+        int job_type_id FK
+        json payload
+        string mode "defer|opportunistic|force"
+        int priority
+        string status "queued|running|done|failed|cancelled"
+        datetime deadline
+        float predicted_kwh
+        float actual_kwh
+        string reason
+        datetime created_at
+        datetime started_at
+        datetime finished_at
+    }
+
+    JOB_EVENT {
+        int id PK
+        int job_id FK
+        datetime ts
+        string kind
+        string message
+    }
+
+    ENERGY_SNAPSHOT {
+        int id PK
+        datetime ts
+        int solar_w
+        int load_w
+        int battery_pct
+        int grid_w
+        float pv1_voltage_v "nullable, per PV string 1..2"
+        float pv1_current_a
+        int pv1_power_w
+        int battery_max_charge_current_a
+        string source
+    }
+
+    REGISTERED_APP {
+        int id PK
+        string name UK
+        string description
+        string token_hash UK "token shown once"
+        datetime created_at
+        datetime last_seen_at
+    }
+
+    APP_POLICY {
+        int id PK
+        int app_id FK "unique with policy_id"
+        int policy_id FK
+        bool is_active "connection switch"
+        datetime created_at
+    }
+
+    POLICY {
+        int id PK
+        string name UK
+        string description
+        bool is_active "policy switch"
+        datetime active_from
+        datetime active_until
+        json weekdays "0=Mon..6=Sun"
+        time time_from
+        time time_to
+        string timezone "IANA, default UTC"
+        int min_solar_w
+        int battery_floor_pct
+        int max_grid_import_w
+        int max_concurrent_jobs
+        datetime created_at
+        datetime updated_at
+    }
+
+    classDef jobType fill:#fdf2fd,stroke:#e879f9
+    classDef job fill:#f0fdfa,stroke:#2dd4bf
+    classDef jobEvent fill:#fff7ed,stroke:#fb923c
+    classDef energy fill:#ecfeff,stroke:#22d3ee
+    classDef policy fill:#f0fdf4,stroke:#4ade80
+    classDef app fill:#f5f3ff,stroke:#a78bfa
+    classDef edge fill:#fefce8,stroke:#facc15
+
+    class JOB_TYPE jobType
+    class JOB job
+    class JOB_EVENT jobEvent
+    class ENERGY_SNAPSHOT energy
+    class POLICY policy
+    class REGISTERED_APP app
+    class APP_POLICY edge

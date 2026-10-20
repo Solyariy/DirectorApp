@@ -1,0 +1,23 @@
+$kind: http-request
+description: '409 when already connected.'
+method: POST
+url: '{{baseUrl}}/apps/:app_id/policies/'
+order: 2000
+pathVariables:
+  - key: app_id
+    value: '{{appId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "policy": "{{policyId}}",
+      "is_active": true
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
