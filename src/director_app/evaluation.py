@@ -5,7 +5,6 @@ from django.utils import timezone
 
 from src.director_app.models import Policy, RegisteredApp
 from src.director_app.schemas import AppEvaluation, PolicyEvaluation
-from src.inverter_app.models import EnergySnapshot
 from src.inverter_app.schemas import EnergySnapshotSchema
 
 
@@ -63,11 +62,10 @@ def find_failed_rules(
 
 def evaluate_app(
     app: RegisteredApp,
-    energy: EnergySnapshot,
+    energy: EnergySnapshotSchema,
     now: datetime | None = None,
 ) -> AppEvaluation:
     now = now or timezone.now()
-    energy = EnergySnapshotSchema.model_validate(energy)
     connections = (
         app.connections.effective()
         .select_related("policy")
