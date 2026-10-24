@@ -1,6 +1,5 @@
-AGENTS.md
-CLAUDE.md
 tools/
+.claude
 .idea
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
@@ -181,7 +180,4 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 /src/director_app/authentication.py
-/FUTURE_NOTES.md
 collector.log
-/postman/
-.postman
