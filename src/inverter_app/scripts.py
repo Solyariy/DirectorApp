@@ -2,9 +2,9 @@ from dataclasses import asdict
 
 from django.utils import timezone
 
-from inverter_app.schemas import EnergySnapshotSchema
 from src.inverter_app.inverter_service.provider import read_latest_energy
 from src.inverter_app.models import EnergySnapshot
+from src.inverter_app.schemas import EnergySnapshotSchema
 
 
 def read_latest_energy_and_save() -> EnergySnapshotSchema:

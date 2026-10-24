@@ -1,3 +1,0 @@
-$kind: collection
-description: 'Inverter readings (inverter_app, `/api/energy/`).'
-order: 4000

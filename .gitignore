@@ -183,3 +183,5 @@ pyrightconfig.json
 /src/director_app/authentication.py
 /FUTURE_NOTES.md
 collector.log
+/postman/
+.postman

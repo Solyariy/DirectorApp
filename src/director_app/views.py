@@ -4,17 +4,13 @@ from rest_framework.response import Response
 
 from src.director_app.evaluation import evaluate_app
 from src.director_app.models import (
-    EFFECTIVE_CONNECTION,
-    AppPolicy,
     Policy,
     RegisteredApp,
     generate_token,
     hash_token,
 )
 from src.director_app.serializers import (
-    AppPolicyCreateSerializer,
-    AppPolicySerializer,
-    PolicyAppSerializer,
+    AppBriefSerializer,
     PolicySerializer,
     RegisteredAppSerializer,
 )
@@ -59,13 +55,18 @@ class OperatorAPIView(views.APIView):
 
 
 def _app_with_token(app: RegisteredApp, token: str) -> dict:
-    app = RegisteredApp.objects.with_counts().get(pk=app.pk)
     return {**RegisteredAppSerializer(app).data, "token": token}
+
+
+def _policies():
+    return Policy.objects.with_counts().prefetch_related(
+        "rule_relations__rule"
+    )
 
 
 class RegisteredAppListView(OperatorAPIView):
     def get(self, request):
-        queryset = RegisteredApp.objects.with_counts()
+        queryset = RegisteredApp.objects.all()
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(name__icontains=search)
@@ -88,11 +89,11 @@ class RegisteredAppListView(OperatorAPIView):
 
 class RegisteredAppDetailView(OperatorAPIView):
     def get(self, request, app_id):
-        app = self.get_or_404(RegisteredApp.objects.with_counts(), pk=app_id)
+        app = self.get_or_404(RegisteredApp.objects, pk=app_id)
         return Response(RegisteredAppSerializer(app).data)
 
     def patch(self, request, app_id):
-        app = self.get_or_404(RegisteredApp.objects.with_counts(), pk=app_id)
+        app = self.get_or_404(RegisteredApp.objects, pk=app_id)
         serializer = RegisteredAppSerializer(
             app,
             data=request.data,
@@ -117,68 +118,12 @@ class RotateTokenView(OperatorAPIView):
         return Response(_app_with_token(app, token))
 
 
-class AppPolicyListView(OperatorAPIView):
-    def get(self, request, app_id):
-        app = self.get_or_404(RegisteredApp.objects, pk=app_id)
-        queryset = app.connections.select_related("policy")
-        is_active = self.parse_bool(request.query_params, "is_active")
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active)
-        effective = self.parse_bool(request.query_params, "effective")
-        if effective is True:
-            queryset = queryset.filter(EFFECTIVE_CONNECTION)
-        elif effective is False:
-            queryset = queryset.exclude(EFFECTIVE_CONNECTION)
-        return Response(AppPolicySerializer(queryset, many=True).data)
-
-    def post(self, request, app_id):
-        app = self.get_or_404(RegisteredApp.objects, pk=app_id)
-        serializer = AppPolicyCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        policy = serializer.validated_data["policy"]
-        if app.connections.filter(policy=policy).exists():
-            return Response(
-                {"detail": "The policy is already connected to this app."},
-                status=status.HTTP_409_CONFLICT,
-            )
-        connection = AppPolicy.objects.create(
-            app=app,
-            policy=policy,
-            is_active=serializer.validated_data["is_active"],
-        )
-        return Response(
-            AppPolicySerializer(connection).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class AppPolicyDetailView(OperatorAPIView):
-    def get_connection(self, app_id, policy_id):
-        return self.get_or_404(
-            AppPolicy.objects.select_related("policy"),
-            app_id=app_id,
-            policy_id=policy_id,
-        )
-
-    def patch(self, request, app_id, policy_id):
-        connection = self.get_connection(app_id, policy_id)
-        serializer = AppPolicySerializer(
-            connection,
-            data=request.data,
-            partial=True,
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def delete(self, request, app_id, policy_id):
-        self.get_connection(app_id, policy_id).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class AppEvaluateView(OperatorAPIView):
     def get(self, request, app_id):
-        app = self.get_or_404(RegisteredApp.objects, pk=app_id)
+        app = self.get_or_404(
+            RegisteredApp.objects.select_related("policy"),
+            pk=app_id,
+        )
         try:
             energy = read_latest_energy_and_save()
         except ConnectionError as e:
@@ -192,7 +137,7 @@ class AppEvaluateView(OperatorAPIView):
 
 class PolicyListView(OperatorAPIView):
     def get(self, request):
-        queryset = Policy.objects.with_counts()
+        queryset = _policies()
         is_active = self.parse_bool(request.query_params, "is_active")
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
@@ -209,7 +154,7 @@ class PolicyListView(OperatorAPIView):
         serializer = PolicySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         policy = serializer.save()
-        policy = Policy.objects.with_counts().get(pk=policy.pk)
+        policy = _policies().get(pk=policy.pk)
         return Response(
             PolicySerializer(policy).data,
             status=status.HTTP_201_CREATED,
@@ -218,7 +163,7 @@ class PolicyListView(OperatorAPIView):
 
 class PolicyDetailView(OperatorAPIView):
     def get(self, request, policy_id):
-        policy = self.get_or_404(Policy.objects.with_counts(), pk=policy_id)
+        policy = self.get_or_404(_policies(), pk=policy_id)
         return Response(PolicySerializer(policy).data)
 
     def put(self, request, policy_id):
@@ -237,11 +182,11 @@ class PolicyDetailView(OperatorAPIView):
 
     def delete(self, request, policy_id):
         policy = self.get_or_404(Policy.objects, pk=policy_id)
-        if policy.connections.filter(is_active=True).exists():
+        if policy.apps.exists():
             return Response(
                 {
-                    "detail": "The policy has active connections to apps; "
-                    "deactivate or disconnect them first."
+                    "detail": "The policy is assigned to apps; "
+                    "move them to another policy first."
                 },
                 status=status.HTTP_409_CONFLICT,
             )
@@ -249,7 +194,7 @@ class PolicyDetailView(OperatorAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _update(self, request, policy_id, partial):
-        policy = self.get_or_404(Policy.objects.with_counts(), pk=policy_id)
+        policy = self.get_or_404(_policies(), pk=policy_id)
         serializer = PolicySerializer(
             policy,
             data=request.data,
@@ -263,5 +208,4 @@ class PolicyDetailView(OperatorAPIView):
 class PolicyAppsView(OperatorAPIView):
     def get(self, request, policy_id):
         policy = self.get_or_404(Policy.objects, pk=policy_id)
-        connections = policy.connections.select_related("app")
-        return Response(PolicyAppSerializer(connections, many=True).data)
+        return Response(AppBriefSerializer(policy.apps.all(), many=True).data)
