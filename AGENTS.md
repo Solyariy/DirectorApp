@@ -78,7 +78,7 @@ Default section order:
 
 - LLM Task Director: Django + DRF service that schedules home-server LLM jobs on solar surplus; README.md is the target API contract (much of it not implemented yet)
 - Stack: Python 3.11+, Django 5.2, DRF, django-filter, pydantic, structlog, pysolarmanv5, pvlib (+pandas), requests; deps managed by `uv` (`pyproject.toml`, `uv.lock`)
-- DB: SQLite at `db.sqlite3` (local, untracked); settings module `config.settings`
+- DB: shared Postgres 17 from `compose.yaml` (`db` service; start with `docker compose up -d db`, needed for tests too), connection from `POSTGRES_*` in `.env`; project tables in schema `apps`, Django's own in `public`; `db.sqlite3` is the legacy pre-Postgres DB, kept untouched (never delete); settings module `config.settings`
 - Secrets/env: `.env` (untracked) loaded via `python-dotenv`; keys listed in `.env.example`
 - Commands: `uv run python manage.py runserver`, `uv run python manage.py makemigrations`/`migrate`, `pyfmt [--check] [paths]`
 
@@ -114,7 +114,7 @@ When the user requests a durable behavior change, record it here or in the relev
   - `config/` — Django project package: settings, root URLconf (`admin/`, `api/energy/` → `src.inverter_app.urls`, `api/` → `src.director_app.urls`), ASGI/WSGI
   - `docs/` — `db-schema.mmd` (Mermaid ER source of truth) and rendered `db-schema.png`
   - `postman/` — Postman workspace files; `collections/DirectorApp` is the API collection (v3 YAML, edited by hand)
-  - `manage.py`, `pyproject.toml`, `uv.lock`, `.env.example`, `README.md`
+  - `manage.py`, `pyproject.toml`, `uv.lock`, `.env.example`, `README.md`, `compose.yaml` (Postgres `db` service)
 
 <API_TASKS>
 Before responding to any non-trivial API engineering task — designing, implementing, mocking, testing, monitoring, documenting, or deploying an API or Postman Flow — read `postman/skills/api-builder/SKILL.md` and follow it. It is the default entry point for API work in this repository. Pure questions and trivial one-line edits do not need it.

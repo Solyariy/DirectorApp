@@ -1,5 +1,7 @@
 from django.db import models
 
+from src.utils.db import apps_table
+
 
 class EnergySnapshot(models.Model):
     timestamp = models.DateTimeField(auto_created=True)
@@ -20,3 +22,6 @@ class EnergySnapshot(models.Model):
     pv2_current_a = models.FloatField(null=True)
     pv2_power_w = models.IntegerField(null=True)
     battery_max_charge_current_a = models.IntegerField(null=True)
+
+    class Meta:
+        db_table = apps_table("inverter_app_energysnapshot")

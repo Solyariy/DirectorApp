@@ -9,6 +9,7 @@ from src.director_app.rules import evaluate, validate_combination
 from src.director_app.schemas import RuleContext
 from src.inverter_app.schemas import EnergySnapshotSchema
 from src.inverter_app.scripts import read_latest_energy_and_save
+from src.utils.db import apps_table
 
 TOKEN_PREFIX = "tdk_"
 
@@ -31,6 +32,7 @@ class Rule(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = apps_table("director_app_rule")
         ordering = ["id"]
 
     def __str__(self):
@@ -80,6 +82,7 @@ class Policy(models.Model):
     objects = PolicyQuerySet.as_manager()
 
     class Meta:
+        db_table = apps_table("director_app_policy")
         ordering = ["id"]
         verbose_name_plural = "policies"
 
@@ -127,6 +130,7 @@ class PolicyRuleRelation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = apps_table("director_app_policyrulerelation")
         ordering = ["id"]
         constraints = [
             models.UniqueConstraint(
@@ -164,6 +168,7 @@ class RegisteredApp(models.Model):
     last_seen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = apps_table("director_app_registeredapp")
         ordering = ["id"]
 
     def __str__(self):

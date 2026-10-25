@@ -348,6 +348,8 @@ Example — weekdays, at night, both PV strings together above 2 kW, no grid imp
 
 ## Database schema
 
+Postgres runs in Docker (`compose.yaml`, connection settings `POSTGRES_*` in `.env`): `docker compose up -d db`, then `uv run python manage.py migrate`. Project tables live in the `apps` schema, Django's built-in tables in `public`.
+
 ![Database schema](docs/db-schema.png)
 
 The diagram is rendered from [`docs/db-schema.mmd`](docs/db-schema.mmd):

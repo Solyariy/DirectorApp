@@ -15,6 +15,7 @@ dependencies = [
     "djangorestframework-stubs>=3.18.1",
     "dotenv>=0.9.9",
     "markdown>=3.11.1",
+    "psycopg[binary]>=3.3.6",
     "pvlib>=0.16.1",
     "pydantic>=2.14.1",
     "pysolarmanv5>=3.0.6",
