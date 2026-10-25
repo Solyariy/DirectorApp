@@ -12,7 +12,7 @@
   - `annotations.py` — pydantic-annotated `NewType`s (`StrUUID`, `LocalFilePath`, `Timestamp`)
   - `order.py` — UTC/Kyiv `datetime` helpers, `get_uuid_str()`, `get_log_id()` (lazily sets the `LOG_ID` context var)
   - `db.py` — `APPS_SCHEMA` and `apps_table(name)`, the schema-qualified `db_table` for app models
-  - `logs.py` — structlog setup; `Logger` (static `info/debug/warning/error`, adds caller name, file:line and `log_id`) and `LoggerMixin` (`log_info/log_warning/log_error` prefixed with class name)
+  - `logs.py` — structlog setup; `Logger` (static `info/debug/warning/error`, adds caller name, file:line and `log_id`; ANSI colors off when `NO_COLOR` is set) and `LoggerMixin` (`log_info/log_warning/log_error` prefixed with class name)
 - `settings.py` — `LOG_ID` `ContextVar` shared by logging utils (not Django settings)
 
 ## Local Contracts

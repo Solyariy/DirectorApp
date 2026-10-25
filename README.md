@@ -70,9 +70,10 @@ What the site contains (business logic):
  "battery_pct": 82}
 ```
 
-Snapshots also carry the per-string PV operating point and the battery charge limit (`pv1_voltage_v`, `pv1_current_a`, `pv1_power_w`, `pv2_*`, `battery_max_charge_current_a`; `null` on older rows). They are used to tell curtailed solar readings from ones that show the real available power. A cron job stores one snapshot per minute as training data:
+Snapshots also carry the per-string PV operating point and the battery charge limit (`pv1_voltage_v`, `pv1_current_a`, `pv1_power_w`, `pv2_*`, `battery_max_charge_current_a`; `null` on older rows). They are used to tell curtailed solar readings from ones that show the real available power. The `inverter-worker` container (`deploy/inverter_worker/`, supercronic) stores one snapshot every `INVERTER_WORKER_CRON_CYCLE_MINUTES` minutes (`.env`, default 5; values that don't divide 60 also restart at each full hour) as training data. It writes to the compose `db` service; run `migrate` from the host first:
 ```
-* * * * * cd /path/to/repo && uv run python manage.py collect_energy_snapshot >> collector.log 2>&1
+docker compose up -d db inverter-worker
+docker compose logs -f inverter-worker
 ```
 `uv run python manage.py compare_pv_estimate --date YYYY-MM-DD [--csv out.csv]` is a proof of concept. It compares one day of snapshots with satellite irradiance (Open-Meteo) and the clear-sky ceiling (pvlib), and needs the `PV_SITE_*` keys from `.env.example`.
 

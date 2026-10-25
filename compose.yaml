@@ -17,5 +17,21 @@ services:
       timeout: 3s
       retries: 10
 
+  # collect_energy_snapshot every INVERTER_WORKER_CRON_CYCLE_MINUTES (.env) minutes (deploy/inverter_worker/)
+  inverter-worker:
+    build:
+      context: .
+      dockerfile: deploy/inverter_worker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: worker_settings
+      # compose network, not the host-published localhost:POSTGRES_PORT
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

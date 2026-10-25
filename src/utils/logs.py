@@ -1,5 +1,6 @@
 import functools
 import logging
+import os
 import sys
 import traceback
 
@@ -18,7 +19,11 @@ structlog.configure(
         # structlog.stdlib.PositionalArgumentsFormatter(),
         # structlog.processors.StackInfoRenderer(),
         # structlog.processors.format_exc_info,
-        structlog.dev.ConsoleRenderer(sort_keys=False),
+        # NO_COLOR (no-color.org) drops ANSI codes, e.g. in containers
+        structlog.dev.ConsoleRenderer(
+            sort_keys=False,
+            colors="NO_COLOR" not in os.environ,
+        ),
     ],
     wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
     context_class=dict,

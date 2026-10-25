@@ -7,7 +7,8 @@ from src.utils.logs import Logger
 class Command(BaseCommand):
     help = (
         "Read the inverter once and store an EnergySnapshot. "
-        "Meant to run from cron (e.g. every minute)."
+        "Meant to run from cron "
+        "(every INVERTER_WORKER_CRON_CYCLE_MINUTES minutes)."
     )
 
     def handle(self, *args, **options):

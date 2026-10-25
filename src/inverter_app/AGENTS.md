@@ -13,7 +13,7 @@
 - `curtailment.py` — `classify(snapshot, mpp_voltages) -> PvState` (`dark` / `unconstrained` / `curtailed` / `unknown`) and `estimate_mpp_voltages(snapshots)`: per-string reference MPP voltage = median voltage while the battery had headroom. Unconstrained = battery charging below 90% of its limit and < 95% SOC, or strings at MPP voltage; curtailed = string voltage > 1.08 × reference (Deye moves toward Voc when curtailing). Thresholds are proof-of-concept constants
 - `irradiance.py` — proof of concept: `get_pv_site()` (`PV_SITE_*` env, read lazily, `ImproperlyConfigured` if missing), `fetch_satellite_gti()` (Open-Meteo Satellite Radiation API, `global_tilted_irradiance_instant`, native 10-15 min, UTC), `clear_sky_gti()` (pvlib Ineichen → plane of array), `gti_to_power_w()`
 - `management/commands/`:
-  - `collect_energy_snapshot` — one inverter read → `EnergySnapshot`; exits non-zero when the inverter is unreachable. Run from cron every minute (line in README.md)
+  - `collect_energy_snapshot` — one inverter read → `EnergySnapshot`; exits non-zero when the inverter is unreachable. Run every `INVERTER_WORKER_CRON_CYCLE_MINUTES` minutes (`.env`, 1-59, default 5) by the `inverter-worker` compose service (`deploy/inverter_worker/`; `entrypoint.sh` validates it and writes the crontab at container start, so a change needs only `docker compose up -d inverter-worker`)
   - `compare_pv_estimate --date --reference-days --csv` — one day of snapshots vs satellite estimate and clear-sky ceiling; calibrates the performance ratio on unconstrained rows, reports bias/MAE and estimated unused PV while curtailed
 - `scripts.py` — `read_latest_energy_and_save()`: live read + persisted `EnergySnapshot`; entry point for other apps
 - `views.py` / `urls.py`:
@@ -29,6 +29,7 @@
 
 ## Local Contracts
 
+- The `inverter-worker` image (`deploy/inverter_worker/Dockerfile`) contains only `src/inverter_app`, `src/utils`, `src/settings.py` and deps django/psycopg/pysolarmanv5/pydantic/structlog/dotenv, with `deploy/inverter_worker/settings.py` (`INSTALLED_APPS = ["src.inverter_app"]`): code loaded by `collect_energy_snapshot` must not import director_app, DRF, pandas or pvlib; new runtime deps of that path go into the Dockerfile install list. Other commands (`compare_pv_estimate`) don't run in the worker
 - Treat `EnergySnapshot` rows as ledger entries: create, never update; any live read that matters is persisted (`scripts.read_latest_energy_and_save()`)
 - `inverter_service` types (`InverterStats`, provider) must not be imported outside inverter_app; expose `EnergySnapshot` / `EnergySnapshotSchema` instead
 - `EnergySnapshotSchema` fields with a number, `time` or `datetime` type are director_app rule fields automatically (`director_app.rules.rule_fields()`); renaming or removing one makes stored rules that read it evaluate as unknown (fail)
