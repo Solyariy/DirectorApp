@@ -69,7 +69,7 @@ class Logger:
     def info(
         msg: str,
         *,
-        msg_location: tuple[str, int],
+        msg_location: tuple[str, int] = None,
         increase_depth: int = 1,
         event: str = "",
         **kwargs,
@@ -88,7 +88,7 @@ class Logger:
     def debug(
         msg: str,
         *,
-        msg_location: tuple[str, int],
+        msg_location: tuple[str, int] = None,
         increase_depth: int = 1,
         event: str = "",
         **kwargs,
