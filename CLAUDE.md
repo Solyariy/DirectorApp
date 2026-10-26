@@ -26,6 +26,7 @@ add short description of acquired knowledge here in bulleted list:
 - Never connect to Postman cloud: no Postman MCP, no cloud push/publish/monitors/mocks, no Postman CLI runs (they report runs to the cloud by default); the user tests locally by opening `postman/` in the Postman app, so after changing the collection say which requests to run there
 - DB is a shared Postgres container (`compose.yaml`, `docker compose up -d db` must run before `migrate`/tests); app tables go to schema `apps` via `Meta.db_table = apps_table(...)` (`src/utils/db.py`), Django tables stay in `public`; each app owns its migrations (developed in parallel); `db.sqlite3` is the legacy DB — never delete it
 - Surplus can't be computed as `solar - load`: solar panels curtail output when nothing consumes it, so solar power reflects consumption, not availability; the `surplus_threshold_w` policy rule was removed for this reason
+- The old jobs design (job types, jobs, job events, `/api/scheduler/decision/` dispatcher, defer/opportunistic/force modes, kWh estimates) was removed from README/schema as outdated; a new jobs architecture is being designed. `Policy.max_concurrent_jobs` and the `JobConsumption` idea are kept for it
 
 ## Scope discipline
 - Implement only the fields and enums I ask for. Propose extra fields (e.g. content_type) as suggestions, and don't add them to code.

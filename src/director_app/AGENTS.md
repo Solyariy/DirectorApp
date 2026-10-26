@@ -4,7 +4,7 @@
 
 - README domain, mounted at `api/` in `config/urls.py`
 - Implemented: registered apps (one policy each), policies, rules (admin-only), policy evaluation (`/api/apps/…`, `/api/policies/…`, `/admin/director_app/…`)
-- Not yet: job types, jobs, forecasts, dispatcher decisions, `JobConsumption`
+- Not yet: jobs (old job types / jobs / job events / dispatcher design removed; new design pending), `JobConsumption`
 
 ## Ownership
 
@@ -50,10 +50,10 @@
 - `grid_power_w`: positive = grid import, negative = export
 - No surplus rule: panels curtail output when nothing consumes it, so `solar - load` does not show available power; don't add `surplus_threshold_w`-style rules back
 - `parse_bool()` accepts `true`/`false`/`1`/`0` (case-insensitive), anything else → `400`
-- `max_concurrent_jobs` is stored but not evaluated until jobs are linked to apps
+- `max_concurrent_jobs` is stored but not evaluated; kept for the new jobs design
 - Policies have no predicted-energy limits (no `max_job_kwh`, `daily_budget_kwh`, `max_force_kwh`): job energy can't be predicted reliably; energy figures come from measured `JobConsumption` history
 - Planned model `JobConsumption` — measured energy of one job run, one row per run:
-  - `job` FK (and `app` FK once Job ↔ RegisteredApp exists), `started_at`, `finished_at`
+  - links to a run in the new jobs design (and to its `app`), `started_at`, `finished_at`
   - `method`: `inverter_delta` (household load from `EnergySnapshot` ledger during the run minus the baseline before start; noisy, other loads leak in) or `host_reported` (power reported by the PC itself, e.g. GPU/CPU sensors)
   - `energy_wh`, `avg_power_w`, `peak_power_w`, `baseline_load_w`, `sample_count`; `host_metrics` JSON for raw PC data
   - Experimental follow-up: a recommendation system trained on `JobConsumption` + `EnergySnapshot` history that suggests run windows, policy thresholds and PC load settings (batch size, power cap) to balance PC and inverter load

@@ -76,7 +76,7 @@ Default section order:
 
 ## Project
 
-- LLM Task Director: Django + DRF service that schedules home-server LLM jobs on solar surplus; README.md is the target API contract (much of it not implemented yet)
+- LLM Task Director: Django + DRF service that decides whether registered home-server LLM apps may run, from policies over live solar inverter readings; README.md is the API contract
 - Stack: Python 3.11+, Django 5.2, DRF, django-filter, pydantic, structlog, pysolarmanv5, pvlib (+pandas), requests; deps managed by `uv` (`pyproject.toml`, `uv.lock`)
 - DB: shared Postgres 17 from `compose.yaml` (`db` service; start with `docker compose up -d db`, needed for tests too), connection from `POSTGRES_*` in `.env`; project tables in schema `apps`, Django's own in `public`; `db.sqlite3` is the legacy pre-Postgres DB, kept untouched (never delete); settings module `config.settings`
 - Secrets/env: `.env` (untracked) loaded via `python-dotenv`; keys listed in `.env.example`

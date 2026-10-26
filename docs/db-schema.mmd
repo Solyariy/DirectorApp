@@ -1,42 +1,7 @@
 erDiagram
-    JOB_TYPE ||--o{ JOB : has
-    JOB ||--o{ JOB_EVENT : logs
     POLICY |o--o{ REGISTERED_APP : governs
     POLICY ||--o{ POLICY_RULE_RELATION : combines
     RULE ||--o{ POLICY_RULE_RELATION : "used by"
-
-    JOB_TYPE {
-        int id PK
-        string name UK
-        float avg_kwh
-        int avg_duration_s
-        int runs_count
-    }
-
-    JOB {
-        int id PK
-        string name
-        int job_type_id FK
-        json payload
-        string mode "defer|opportunistic|force"
-        int priority
-        string status "queued|running|done|failed|cancelled"
-        datetime deadline
-        float predicted_kwh
-        float actual_kwh
-        string reason
-        datetime created_at
-        datetime started_at
-        datetime finished_at
-    }
-
-    JOB_EVENT {
-        int id PK
-        int job_id FK
-        datetime ts
-        string kind
-        string message
-    }
 
     ENERGY_SNAPSHOT {
         int id PK
@@ -91,18 +56,12 @@ erDiagram
         datetime updated_at
     }
 
-    classDef jobType fill:#fdf2fd,stroke:#e879f9
-    classDef job fill:#f0fdfa,stroke:#2dd4bf
-    classDef jobEvent fill:#fff7ed,stroke:#fb923c
     classDef energy fill:#ecfeff,stroke:#22d3ee
     classDef policy fill:#f0fdf4,stroke:#4ade80
     classDef app fill:#f5f3ff,stroke:#a78bfa
     classDef edge fill:#fefce8,stroke:#facc15
     classDef rule fill:#fef2f2,stroke:#f87171
 
-    class JOB_TYPE jobType
-    class JOB job
-    class JOB_EVENT jobEvent
     class ENERGY_SNAPSHOT energy
     class POLICY policy
     class REGISTERED_APP app
