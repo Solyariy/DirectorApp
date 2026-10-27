@@ -1,0 +1,8 @@
+$kind: collection
+description: "Energy-aware job director: operator API for registered apps, rules, policies and jobs (director_app, `/api/`) and inverter energy readings (inverter_app, `/api/energy/`). Run the server with `uv run python manage.py runserver`."
+variables:
+  baseUrl: http://127.0.0.1:8000/api
+  appId: "1"
+  ruleId: "1"
+  policyId: "1"
+  jobId: "1"
