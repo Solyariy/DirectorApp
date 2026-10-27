@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from src.director_app.models import (
+    Job,
     Policy,
     PolicyRuleRelation,
     RegisteredApp,
@@ -47,6 +48,7 @@ ENERGY = EnergySnapshotSchema(
 )
 SUNNY = {"ge": [{"field": "solar_power_w"}, 1500]}
 VERY_SUNNY = {"ge": [{"field": "solar_power_w"}, 5000]}
+REPORT_URL = "https://example.com/docs/report.pdf"
 NIGHT = {
     "or": [
         {"ge": [{"field": "local_time"}, "22:00"]},
@@ -111,15 +113,11 @@ class OperatorTestCase(TestCase):
 
 
 class RegisteredAppTests(OperatorTestCase):
-    def test_create_returns_token_once(self):
+    def test_create(self):
         app = self.create_app()
-        self.assertTrue(app["token"].startswith("tdk_"))
+        self.assertEqual(app["name"], "doc-indexer")
         self.assertIsNone(app["policy"])
-        self.assertIsNone(app["last_seen_at"])
-        stored = RegisteredApp.objects.get(pk=app["id"])
-        self.assertNotEqual(stored.token_hash, app["token"])
-        detail = self.client.get(f"/api/apps/{app['id']}/").data
-        self.assertNotIn("token", detail)
+        self.assertTrue(RegisteredApp.objects.filter(pk=app["id"]).exists())
 
     def test_duplicate_or_empty_name_is_400(self):
         self.create_app()
@@ -138,7 +136,6 @@ class RegisteredAppTests(OperatorTestCase):
         response = self.client.get("/api/apps/", {"search": "photo"})
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["name"], "photo-tagger")
-        self.assertNotIn("token", response.data["results"][0])
 
     def test_assign_one_policy(self):
         policy = self.create_policy()
@@ -154,28 +151,201 @@ class RegisteredAppTests(OperatorTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("policy", response.data)
 
-    def test_patch_and_delete(self):
+    def test_update_and_delete(self):
         policy = self.create_policy()
         app = self.create_app(policy=policy["id"])
+        url = f"/api/apps/{app['id']}/"
         response = self.client.patch(
-            f"/api/apps/{app['id']}/",
+            url,
             {"description": "Updated"},
             format="json",
         )
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["description"], "Updated")
         self.assertEqual(response.data["policy"], policy["id"])
-        response = self.client.delete(f"/api/apps/{app['id']}/")
+        response = self.client.put(
+            url,
+            {"description": "Renamed"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("name", response.data)
+        self.create_app("photo-tagger")
+        response = self.client.put(
+            url,
+            {"name": "photo-tagger", "description": "Renamed"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("name", response.data)
+        response = self.client.put(
+            url,
+            {"name": "wiki-indexer", "description": "Renamed", "policy": None},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["name"], "wiki-indexer")
+        self.assertEqual(response.data["description"], "Renamed")
+        self.assertIsNone(response.data["policy"])
+        self.assertEqual(response.data["created_at"], app["created_at"])
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, 204)
         self.assertTrue(Policy.objects.filter(pk=policy["id"]).exists())
-        response = self.client.get(f"/api/apps/{app['id']}/")
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.data["detail"], "Not found.")
+        self.assertEqual(self.client.patch(url, {}).status_code, 404)
+        self.assertEqual(self.client.put(url, {}).status_code, 404)
 
-    def test_rotate_token(self):
-        app = self.create_app()
-        response = self.client.post(f"/api/apps/{app['id']}/rotate-token/")
+
+class RuleTests(OperatorTestCase):
+    def create_rule(self, name="Sunny", combination=SUNNY, **fields):
+        response = self.client.post(
+            "/api/rules/",
+            {"name": name, "combination": combination, **fields},
+            format="json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            response.data,
+        )
+        return response.data
+
+    def test_create_rule(self):
+        rule = self.create_rule(description="Solar above 1.5 kW")
+        self.assertEqual(rule["combination"], SUNNY)
+        self.assertEqual(rule["description"], "Solar above 1.5 kW")
+        self.assertTrue(rule["is_active"])
+        self.assertTrue(Rule.objects.get(pk=rule["id"]).passed(ENERGY))
+        night = self.create_rule(
+            "Night",
+            NIGHT,
+            is_active=False,
+        )
+        self.assertFalse(night["is_active"])
+        self.assertEqual(night["description"], "")
+
+    def test_validation_errors(self):
+        self.create_rule("Taken")
+        invalid = [
+            ({"name": "Taken"}, "name"),
+            ({"name": ""}, "name"),
+            ({"combination": None}, "combination"),
+            ({"combination": {"nope": []}}, "combination"),
+            (
+                {"combination": {"add": [{"field": "solar_power_w"}, 1]}},
+                "combination",
+            ),
+        ]
+        for fields, error_field in invalid:
+            with self.subTest(fields=fields):
+                response = self.client.post(
+                    "/api/rules/",
+                    {"name": "Bad", "combination": SUNNY, **fields},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(error_field, response.data)
+        response = self.client.post(
+            "/api/rules/",
+            {"name": "Bad"},
+            format="json",
+        )
+        self.assertIn("combination", response.data)
+        response = self.client.post(
+            "/api/rules/",
+            {
+                "name": "Bad",
+                "combination": {
+                    "and": [SUNNY, {"ge": [{"field": "nope"}, 1]}]
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(
+            response.data["combination"],
+            ["and[1].ge[0].field: unknown field 'nope'"],
+        )
+
+    def test_list_filters(self):
+        self.create_rule("Sunny")
+        self.create_rule(
+            "Night",
+            NIGHT,
+            is_active=False,
+        )
+        response = self.client.get("/api/rules/", {"is_active": "false"})
+        self.assertEqual(
+            [r["name"] for r in response.data["results"]],
+            ["Night"],
+        )
+        response = self.client.get("/api/rules/", {"search": "sun"})
+        self.assertEqual(response.data["count"], 1)
+        response = self.client.get("/api/rules/", {"is_active": "maybe"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_get_update_and_delete(self):
+        rule = self.create_rule()
+        url = f"/api/rules/{rule['id']}/"
+        self.assertEqual(self.client.get(url).data, rule)
+        response = self.client.patch(
+            url,
+            {"is_active": False},
+            format="json",
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertNotEqual(response.data["token"], app["token"])
+        self.assertFalse(response.data["is_active"])
+        self.assertEqual(response.data["combination"], SUNNY)
+        response = self.client.put(
+            url,
+            {"name": "Very sunny"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("combination", response.data)
+        response = self.client.patch(
+            url,
+            {"combination": {"nope": []}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.client.put(
+            url,
+            {"name": "Very sunny", "combination": VERY_SUNNY},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["name"], "Very sunny")
+        self.assertEqual(response.data["combination"], VERY_SUNNY)
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.patch(url, {}).status_code, 404)
+        self.assertEqual(self.client.delete(url).status_code, 404)
+        response = self.client.post(f"{url}unlink/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_blocked_while_linked_and_unlink(self):
+        rule = self.create_rule()
+        first = self.create_policy(rules=[{"rule": rule["id"]}])
+        second = self.create_policy(
+            name="Night",
+            rules=[{"rule": rule["id"], "is_active": False}],
+        )
+        url = f"/api/rules/{rule['id']}/"
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("unlink", response.data["detail"])
+        self.assertEqual(PolicyRuleRelation.objects.count(), 2)
+        response = self.client.post(f"{url}unlink/")
+        self.assertEqual(response.status_code, 204)
+        for policy in (first, second):
+            response = self.client.get(f"/api/policies/{policy['id']}/")
+            self.assertEqual(response.data["rules"], [])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(self.client.post(f"{url}unlink/").status_code, 204)
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        self.assertEqual(Policy.objects.count(), 2)
 
 
 class PolicyTests(OperatorTestCase):
@@ -208,26 +378,21 @@ class PolicyTests(OperatorTestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(error_field, response.data)
 
-    def test_rules_are_listed_read_only(self):
-        policy = self.create_policy()
+    def test_set_rules(self):
         sunny = create_rule("Sunny", SUNNY)
         night = create_rule(
             "Night",
             NIGHT,
             is_active=False,
         )
-        attach(policy["id"], sunny)
-        attach(policy["id"], night)
-        url = f"/api/policies/{policy['id']}/"
-        response = self.client.patch(
-            url,
-            {"rules": [], "operator": "or"},
-            format="json",
+        policy = self.create_policy(
+            rules=[
+                {"rule": sunny.id},
+                {"rule": night.id, "is_active": False},
+            ],
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["operator"], "or")
         self.assertEqual(
-            response.data["rules"],
+            policy["rules"],
             [
                 {
                     "rule": {
@@ -244,12 +409,77 @@ class PolicyTests(OperatorTestCase):
                         "name": "Night",
                         "is_active": False,
                     },
-                    "is_active": True,
+                    "is_active": False,
                     "effective": False,
                 },
             ],
         )
-        self.assertEqual(len(self.client.get(url).data["rules"]), 2)
+        url = f"/api/policies/{policy['id']}/"
+        night_link = PolicyRuleRelation.objects.get(rule=night)
+        response = self.client.patch(
+            url,
+            {"operator": "or"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["operator"], "or")
+        self.assertEqual(len(response.data["rules"]), 2)
+        response = self.client.patch(
+            url,
+            {"rules": [{"rule": night.id}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [
+                (r["rule"]["id"], r["is_active"])
+                for r in response.data["rules"]
+            ],
+            [(night.id, True)],
+        )
+        link = PolicyRuleRelation.objects.get(rule=night)
+        self.assertEqual(link.pk, night_link.pk)
+        self.assertEqual(link.created_at, night_link.created_at)
+        self.assertTrue(Rule.objects.filter(pk=sunny.pk).exists())
+        response = self.client.put(
+            url,
+            {"name": "Sunny weekdays", "rules": []},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["rules"], [])
+        self.assertEqual(self.client.get(url).data["rules"], [])
+
+    def test_rules_validation_errors(self):
+        sunny = create_rule("Sunny", SUNNY)
+        policy = self.create_policy(rules=[{"rule": sunny.id}])
+        invalid = [
+            [{"rule": 999}],
+            [{"rule": sunny.id}, {"rule": sunny.id, "is_active": False}],
+            [{"is_active": True}],
+            {"rule": sunny.id},
+        ]
+        for rules in invalid:
+            with self.subTest(rules=rules):
+                response = self.client.patch(
+                    f"/api/policies/{policy['id']}/",
+                    {"rules": rules},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("rules", response.data)
+                response = self.client.post(
+                    "/api/policies/",
+                    {"name": "Bad", "rules": rules},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("rules", response.data)
+        self.assertEqual(
+            list(PolicyRuleRelation.objects.values_list("rule", flat=True)),
+            [sunny.id],
+        )
+        self.assertFalse(Policy.objects.filter(name="Bad").exists())
 
     def test_list_filters(self):
         self.create_policy(name="Sunny weekdays")
@@ -278,6 +508,135 @@ class PolicyTests(OperatorTestCase):
         self.assign(app["id"], None)
         self.assertEqual(self.client.delete(url).status_code, 204)
         self.assertEqual(self.client.get(url).status_code, 404)
+
+
+class JobTests(OperatorTestCase):
+    def create_job(self, **fields):
+        body = {
+            "model": "llama3.1:8b",
+            "data": [REPORT_URL],
+            "prompt": "Summarize the document.",
+            **fields,
+        }
+        response = self.client.post(
+            "/api/jobs/",
+            body,
+            format="json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            response.data,
+        )
+        return response.data
+
+    def test_create_job_is_queued(self):
+        app = self.create_app()
+        job = self.create_job(app=app["id"])
+        self.assertEqual(job["app"], app["id"])
+        self.assertEqual(job["model"], "llama3.1:8b")
+        self.assertEqual(job["data"], [REPORT_URL])
+        self.assertEqual(job["status"], Job.Status.QUEUED)
+        self.assertIsNotNone(job["created_at"])
+        self.assertIsNotNone(job["updated_at"])
+        self.assertIsNone(self.create_job()["app"])
+
+    def test_validation_errors(self):
+        valid = {
+            "model": "llama3.1:8b",
+            "data": [REPORT_URL],
+            "prompt": "Summarize the document.",
+        }
+        cases = [
+            ("model", {**valid, "model": ""}),
+            ("prompt", {**valid, "prompt": ""}),
+            ("data", {**valid, "data": []}),
+            ("data", {**valid, "data": ["not-a-url"]}),
+            ("data", {**valid, "data": [REPORT_URL, "ftp://example.com/x"]}),
+            ("status", {**valid, "status": "running"}),
+            ("app", {**valid, "app": 999}),
+        ]
+        # Each required field missing.
+        for field in valid:
+            body = {k: v for k, v in valid.items() if k != field}
+            cases.append((field, body))
+        for field, body in cases:
+            with self.subTest(body=body):
+                response = self.client.post(
+                    "/api/jobs/",
+                    body,
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.data)
+
+    def test_list_status_filter_and_pagination(self):
+        self.create_job()
+        self.create_job(status=Job.Status.FAILED)
+        self.assertEqual(self.client.get("/api/jobs/").data["count"], 2)
+        response = self.client.get(
+            "/api/jobs/",
+            {"status": "failed"},
+        )
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["status"], "failed")
+        response = self.client.get(
+            "/api/jobs/",
+            {"page_size": 1},
+        )
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNotNone(response.data["next"])
+        response = self.client.get(
+            "/api/jobs/",
+            {"status": "running"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("status", response.data)
+
+    def test_get_update_and_delete(self):
+        job = self.create_job()
+        url = f"/api/jobs/{job['id']}/"
+        self.assertEqual(self.client.get(url).data, job)
+        response = self.client.patch(
+            url,
+            {"status": "in-process"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "in-process")
+        self.assertEqual(response.data["prompt"], job["prompt"])
+        response = self.client.put(
+            url,
+            {"model": "qwen2.5:14b", "prompt": "Translate."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("data", response.data)
+        response = self.client.put(
+            url,
+            {
+                "model": "qwen2.5:14b",
+                "data": [REPORT_URL, "http://example.com/b.txt"],
+                "prompt": "Translate.",
+                "status": "success",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["model"], "qwen2.5:14b")
+        self.assertEqual(len(response.data["data"]), 2)
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.patch(url, {}).status_code, 404)
+        self.assertEqual(self.client.delete(url).status_code, 404)
+
+    def test_deleting_app_keeps_its_jobs(self):
+        app = self.create_app()
+        job = self.create_job(app=app["id"])
+        self.client.delete(f"/api/apps/{app['id']}/")
+        response = self.client.get(f"/api/jobs/{job['id']}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["app"])
 
 
 class EvaluateTests(OperatorTestCase):

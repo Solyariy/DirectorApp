@@ -2,6 +2,7 @@ erDiagram
     POLICY |o--o{ REGISTERED_APP : governs
     POLICY ||--o{ POLICY_RULE_RELATION : combines
     RULE ||--o{ POLICY_RULE_RELATION : "used by"
+    REGISTERED_APP |o--o{ JOB : submits
 
     ENERGY_SNAPSHOT {
         int id PK
@@ -21,10 +22,19 @@ erDiagram
         int id PK
         string name UK
         string description
-        string token_hash UK "token shown once"
         int policy_id FK "nullable, one policy per app"
         datetime created_at
-        datetime last_seen_at
+    }
+
+    JOB {
+        int id PK
+        int app_id FK "nullable, set null on app delete"
+        string model "LLM model name"
+        string_array data "public http(s) URLs"
+        string prompt
+        string status "queued|in-process|success|failed"
+        datetime created_at
+        datetime updated_at
     }
 
     POLICY {
@@ -61,9 +71,11 @@ erDiagram
     classDef app fill:#f5f3ff,stroke:#a78bfa
     classDef edge fill:#fefce8,stroke:#facc15
     classDef rule fill:#fef2f2,stroke:#f87171
+    classDef job fill:#fff7ed,stroke:#fb923c
 
     class ENERGY_SNAPSHOT energy
     class POLICY policy
     class REGISTERED_APP app
     class POLICY_RULE_RELATION edge
     class RULE rule
+    class JOB job

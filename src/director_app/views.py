@@ -3,16 +3,13 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from src.director_app.evaluation import evaluate_app
-from src.director_app.models import (
-    Policy,
-    RegisteredApp,
-    generate_token,
-    hash_token,
-)
+from src.director_app.models import Job, Policy, RegisteredApp, Rule
 from src.director_app.serializers import (
     AppBriefSerializer,
+    JobSerializer,
     PolicySerializer,
     RegisteredAppSerializer,
+    RuleSerializer,
 )
 from src.inverter_app.scripts import read_latest_energy_and_save
 
@@ -54,10 +51,6 @@ class OperatorAPIView(views.APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
-def _app_with_token(app: RegisteredApp, token: str) -> dict:
-    return {**RegisteredAppSerializer(app).data, "token": token}
-
-
 def _policies():
     return Policy.objects.with_counts().prefetch_related(
         "rule_relations__rule"
@@ -79,10 +72,9 @@ class RegisteredAppListView(OperatorAPIView):
     def post(self, request):
         serializer = RegisteredAppSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        token = generate_token()
-        app = serializer.save(token_hash=hash_token(token))
+        serializer.save()
         return Response(
-            _app_with_token(app, token),
+            serializer.data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -92,30 +84,35 @@ class RegisteredAppDetailView(OperatorAPIView):
         app = self.get_or_404(RegisteredApp.objects, pk=app_id)
         return Response(RegisteredAppSerializer(app).data)
 
+    def put(self, request, app_id):
+        return self._update(
+            request,
+            app_id,
+            partial=False,
+        )
+
     def patch(self, request, app_id):
-        app = self.get_or_404(RegisteredApp.objects, pk=app_id)
-        serializer = RegisteredAppSerializer(
-            app,
-            data=request.data,
+        return self._update(
+            request,
+            app_id,
             partial=True,
         )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
 
     def delete(self, request, app_id):
         app = self.get_or_404(RegisteredApp.objects, pk=app_id)
         app.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-class RotateTokenView(OperatorAPIView):
-    def post(self, request, app_id):
+    def _update(self, request, app_id, partial):
         app = self.get_or_404(RegisteredApp.objects, pk=app_id)
-        token = generate_token()
-        app.token_hash = hash_token(token)
-        app.save(update_fields=["token_hash"])
-        return Response(_app_with_token(app, token))
+        serializer = RegisteredAppSerializer(
+            app,
+            data=request.data,
+            partial=partial,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class AppEvaluateView(OperatorAPIView):
@@ -133,6 +130,80 @@ class AppEvaluateView(OperatorAPIView):
             )
         evaluation = evaluate_app(app, energy)
         return Response(evaluation.model_dump(mode="json"))
+
+
+class RuleListView(OperatorAPIView):
+    def get(self, request):
+        queryset = Rule.objects.all()
+        is_active = self.parse_bool(request.query_params, "is_active")
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active)
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+        return self.paginate(
+            request,
+            queryset,
+            RuleSerializer,
+        )
+
+    def post(self, request):
+        serializer = RuleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RuleDetailView(OperatorAPIView):
+    def get(self, request, rule_id):
+        rule = self.get_or_404(Rule.objects, pk=rule_id)
+        return Response(RuleSerializer(rule).data)
+
+    def put(self, request, rule_id):
+        return self._update(
+            request,
+            rule_id,
+            partial=False,
+        )
+
+    def patch(self, request, rule_id):
+        return self._update(
+            request,
+            rule_id,
+            partial=True,
+        )
+
+    def delete(self, request, rule_id):
+        rule = self.get_or_404(Rule.objects, pk=rule_id)
+        # Dropping a rule silently would change its policies' decisions.
+        if rule.policy_relations.exists():
+            return Response(
+                {"detail": "The rule is linked to policies; unlink it first."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        rule.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _update(self, request, rule_id, partial):
+        rule = self.get_or_404(Rule.objects, pk=rule_id)
+        serializer = RuleSerializer(
+            rule,
+            data=request.data,
+            partial=partial,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class RuleUnlinkView(OperatorAPIView):
+    def post(self, request, rule_id):
+        rule = self.get_or_404(Rule.objects, pk=rule_id)
+        rule.policy_relations.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class PolicyListView(OperatorAPIView):
@@ -201,11 +272,75 @@ class PolicyDetailView(OperatorAPIView):
             partial=partial,
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        policy = serializer.save()
+        # Reload: the prefetched rule links may have changed.
+        policy = _policies().get(pk=policy.pk)
+        return Response(PolicySerializer(policy).data)
 
 
 class PolicyAppsView(OperatorAPIView):
     def get(self, request, policy_id):
         policy = self.get_or_404(Policy.objects, pk=policy_id)
         return Response(AppBriefSerializer(policy.apps.all(), many=True).data)
+
+
+class JobListView(OperatorAPIView):
+    def get(self, request):
+        queryset = Job.objects.all()
+        job_status = request.query_params.get("status")
+        if job_status is not None:
+            if job_status not in Job.Status.values:
+                raise ValidationError(
+                    {"status": [f"Must be one of {Job.Status.values}."]}
+                )
+            queryset = queryset.filter(status=job_status)
+        return self.paginate(
+            request,
+            queryset,
+            JobSerializer,
+        )
+
+    def post(self, request):
+        serializer = JobSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class JobDetailView(OperatorAPIView):
+    def get(self, request, job_id):
+        job = self.get_or_404(Job.objects, pk=job_id)
+        return Response(JobSerializer(job).data)
+
+    def put(self, request, job_id):
+        return self._update(
+            request,
+            job_id,
+            partial=False,
+        )
+
+    def patch(self, request, job_id):
+        return self._update(
+            request,
+            job_id,
+            partial=True,
+        )
+
+    def delete(self, request, job_id):
+        job = self.get_or_404(Job.objects, pk=job_id)
+        job.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _update(self, request, job_id, partial):
+        job = self.get_or_404(Job.objects, pk=job_id)
+        serializer = JobSerializer(
+            job,
+            data=request.data,
+            partial=partial,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

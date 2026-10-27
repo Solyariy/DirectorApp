@@ -1,8 +1,7 @@
-import hashlib
-import secrets
 from collections.abc import Iterable
 
-from django.core.validators import MinValueValidator
+from django.contrib.postgres.fields import ArrayField
+from django.core.validators import MinValueValidator, URLValidator
 from django.db import models
 
 from src.director_app.rules import evaluate, validate_combination
@@ -11,15 +10,8 @@ from src.inverter_app.schemas import EnergySnapshotSchema
 from src.inverter_app.scripts import read_latest_energy_and_save
 from src.utils.db import apps_table
 
-TOKEN_PREFIX = "tdk_"
-
-
-def generate_token() -> str:
-    return TOKEN_PREFIX + secrets.token_hex(16)
-
-
-def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
+# Job inputs are fetched over the web.
+validate_http_url = URLValidator(schemes=["http", "https"])
 
 
 class Rule(models.Model):
@@ -150,12 +142,6 @@ class PolicyRuleRelation(models.Model):
 class RegisteredApp(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default="")
-    # Only the hash is stored; the token is shown once on create / rotate.
-    token_hash = models.CharField(
-        max_length=64,
-        unique=True,
-        editable=False,
-    )
     # One policy per app; a policy serves many apps.
     policy = models.ForeignKey(
         Policy,
@@ -165,7 +151,6 @@ class RegisteredApp(models.Model):
         related_name="apps",
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    last_seen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = apps_table("director_app_registeredapp")
@@ -178,3 +163,44 @@ class RegisteredApp(models.Model):
     def effective_policy(self) -> Policy | None:
         policy = self.policy
         return policy if policy is not None and policy.is_active else None
+
+
+class Job(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = "queued"
+        IN_PROCESS = "in-process"
+        SUCCESS = "success"
+        FAILED = "failed"
+
+    # Kept when the app is unregistered, so job history stays.
+    app = models.ForeignKey(
+        RegisteredApp,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="jobs",
+    )
+    # LLM model name.
+    model = models.CharField(max_length=200)
+    # Public URLs of the job input.
+    data = ArrayField(
+        models.URLField(
+            max_length=2048,
+            validators=[validate_http_url],
+        ),
+    )
+    prompt = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = apps_table("director_app_job")
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.model} #{self.pk}"

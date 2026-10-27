@@ -1,9 +1,9 @@
 from django.contrib import admin
 from django.db import models
 
-from director_app.widgets import RuleCombinationWidget
 from src.director_app.models import Policy, PolicyRuleRelation, Rule
 from src.director_app.rules import describe
+from src.director_app.widgets import RuleCombinationWidget
 
 
 class RulePolicyInline(admin.TabularInline):

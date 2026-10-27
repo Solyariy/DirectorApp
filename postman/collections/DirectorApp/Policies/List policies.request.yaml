@@ -5,7 +5,7 @@ order: 1000
 queryParams:
   - key: is_active
     value: 'true'
-    description: 'Filter by is_active (any non-empty value is truthy)'
+    description: 'Filter by is_active: true / false / 1 / 0, anything else is 400'
     disabled: true
   - key: search
     value: ''

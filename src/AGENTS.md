@@ -7,7 +7,7 @@
 ## Ownership
 
 - `inverter_app/` — energy system status (see child doc)
-- `director_app/` — registered apps, rules, policies, policy evaluation (see child doc)
+- `director_app/` — registered apps, rules, policies, policy evaluation, jobs (see child doc)
 - `utils/` — shared helpers:
   - `annotations.py` — pydantic-annotated `NewType`s (`StrUUID`, `LocalFilePath`, `Timestamp`)
   - `order.py` — UTC/Kyiv `datetime` helpers, `get_uuid_str()`, `get_log_id()` (lazily sets the `LOG_ID` context var)
@@ -37,5 +37,5 @@
 
 ## Child DOX Index
 
-- `director_app/AGENTS.md` — `Rule` expressions + admin rule builder, `Policy` (`and`/`or` over rules), `PolicyRuleRelation`, `RegisteredApp` (one policy), app-token auth, policy evaluation, planned `JobConsumption`
+- `director_app/AGENTS.md` — `Rule` expressions, CRUD + admin rule builder, `Policy` (`and`/`or` over rules), `PolicyRuleRelation`, `RegisteredApp` (one policy), `Job` CRUD, policy evaluation, planned `JobConsumption`
 - `inverter_app/AGENTS.md` — `EnergySnapshot` ledger model, `/api/energy/` endpoints, `inverter_service/` Solarman V5 client, curtailment classification, irradiance proof of concept, snapshot collector command

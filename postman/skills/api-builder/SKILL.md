@@ -7,7 +7,7 @@ description: Guide for building high-quality APIs by leveraging postman cli. Use
 
 ## Overview
 
-spec         (none yet - author one before writing code)
+spec         postman/specs/jobs.yaml, postman/specs/rules.yaml (jobs and rules only; other endpoints are documented in README.md)
 collections  postman/collections/
 cli          postman 1.73.0
 

@@ -9,21 +9,20 @@ Heavy background LLM work (batch text processing, building embeddings, fine-tuni
 What the site contains (business logic):
 
 - **Energy system status** — current solar output, household consumption, battery charge, grid exchange, and the history of these readings.
-- **Registered apps** — external applications that ask the Director whether they may run now. An app is registered manually by the operator and is assigned one active policy; requests from unregistered apps, or from apps without an active policy, are rejected.
-- **Rules** — reusable conditions over one energy reading, built in the Django admin: arithmetic, comparison and logic operators over the reading's fields (solar output, battery charge, grid exchange, PV strings, weekday, local time …). A rule is True or False.
+- **Registered apps** — external applications that ask the Director whether they may run now. An app is registered manually by the operator and is assigned one policy.
+- **Rules** — reusable conditions over one energy reading, managed over the API or built in the Django admin: arithmetic, comparison and logic operators over the reading's fields (solar output, battery charge, grid exchange, PV strings, weekday, local time …). A rule is True or False.
 - **Policies** — named run configurations: a policy combines its rules with one logic operator (`and` / `or`) into a single True / False and caps how many of the app's jobs may run at once. Rules and policies are many-to-many; rules, policies and each policy↔rule link can be switched on and off (`is_active`). Every app has one policy; a policy can serve many apps.
+- **Jobs** — LLM work items: the `model` to run, the public `data` URLs it works on, the `prompt`, and a `status` (`queued` → `in-process` → `success` / `failed`). A job may belong to a registered app. For now jobs are plain records managed over the API; nothing dispatches them yet.
 
 ## General API rules
 
 - Base URL: `/api/`. All data is exchanged as **JSON** (`Content-Type: application/json`).
-- Resources are plural nouns; actions on a resource that do not fit CRUD are sub-resources (`/apps/{id}/rotate-token/`).
+- Resources are plural nouns; actions on a resource that do not fit CRUD are sub-resources (`/apps/{id}/evaluate/`).
 - Lists support pagination: `?page=1&page_size=20`. List response:
   `{"count": 42, "next": "...", "previous": null, "results": [ ... ]}`.
-- Validation error: `400` + `{"field": ["message"]}`; not authenticated: `401`; forbidden: `403`; not found: `404` + `{"detail": "Not found."}`; state conflict: `409` + `{"detail": "..."}`.
+- Validation error: `400` + `{"field": ["message"]}`; not found: `404` + `{"detail": "Not found."}`; state conflict: `409` + `{"detail": "..."}`.
 - Time is ISO 8601 (UTC), power is in watts (`W`), energy is in kWh.
-- Access levels:
-  - **operator** — the Director owner: a Django staff user, via HTTP Basic or session authentication. Only the operator manages apps and policies (`/api/apps/…`, `/api/policies/…`); apps calling these endpoints get `403`.
-  - **app** — requests from registered apps carry `Authorization: Bearer <app token>` and must pass the [admission gate](#registered-apps) (`401` — app not registered, `403` — app has no active policy).
+- No authentication for now: every endpoint is open. Authentication will be redesigned in a future update.
 
 ## Endpoints
 
@@ -74,25 +73,20 @@ docker compose logs -f inverter-worker
 
 ### Registered apps
 
-**Admission gate.** A request from an app is processed **only** if the app was **manually registered** in the Director by the operator **and** its assigned policy is active (`app.policy` set and `policy.is_active`).
-- Apps cannot register themselves — there is no self-signup endpoint; all endpoints below are operator-only.
-- Missing or unknown token → `401` `{"detail": "App is not registered."}`.
-- Registered app without an active policy (none assigned, or the policy is inactive) → `403` `{"detail": "App has no active policy."}`. The request is rejected, not queued.
-- Once the gate is passed, the app's policy decides *when* the work runs.
+Apps are registered manually by the operator; the app's policy decides *when* its work may run.
 
 | Method | URL | Purpose |
 |---|---|---|
 | GET | `/api/apps/` | List registered apps |
-| POST | `/api/apps/` | Register an app (manual, operator only) |
+| POST | `/api/apps/` | Register an app |
 | GET | `/api/apps/{id}/` | Get one app |
-| PATCH | `/api/apps/{id}/` | Update `name` / `description` / `policy` |
+| PUT / PATCH | `/api/apps/{id}/` | Update `name` / `description` / `policy` |
 | DELETE | `/api/apps/{id}/` | Unregister an app (its policy stays) |
-| POST | `/api/apps/{id}/rotate-token/` | Issue a new token, the old one stops working |
 | GET | `/api/apps/{id}/evaluate/` | Could the app run right now (dry run, nothing is started) |
 
 **GET `/api/apps/`**
 - Parameters: `search` (by name), `page`, `page_size`.
-- Response `200`: paginated list of app objects (format below, without `token`).
+- Response `200`: paginated list of app objects (format below).
 
 **POST `/api/apps/`**
 - Body:
@@ -100,22 +94,18 @@ docker compose logs -f inverter-worker
 {"name": "doc-indexer", "description": "Nightly embeddings for the home wiki", "policy": 3}
 ```
 - `policy` — id of the app's policy, optional (`null` until one is assigned).
-- Response `201` — `token` is returned **only once**, the Director stores just its hash:
+- Response `201`:
 ```json
 {"id": 4, "name": "doc-indexer", "description": "Nightly embeddings for the home wiki",
- "policy": 3, "token": "tdk_9f2c1e7a4b0d4c58a1e3",
- "created_at": "2026-10-11T09:00:00Z", "last_seen_at": null}
+ "policy": 3, "created_at": "2026-10-11T09:00:00Z"}
 ```
 - Errors: `400` (empty or duplicate `name`, unknown `policy`).
 
-**GET `/api/apps/{id}/`** — `200` + app object (without `token`), `404`.
+**GET `/api/apps/{id}/`** — `200` + app object, `404`.
 
-**PATCH `/api/apps/{id}/`** — body: any of `name`, `description`, `policy` (`{"policy": 3}` assigns a policy, `{"policy": null}` removes it); `200` + updated object; `400`; `404`.
+**PUT / PATCH `/api/apps/{id}/`** — body as in POST (PUT needs `name`; PATCH: any subset of `name`, `description`, `policy`); `{"policy": 3}` assigns a policy, `{"policy": null}` removes it; `200` + updated object; `400` (missing, empty or duplicate `name`, unknown `policy`); `404`.
 
 **DELETE `/api/apps/{id}/`** — `204`; `404`. The app's policy stays.
-
-**POST `/api/apps/{id}/rotate-token/`**
-- Body: none. Response `200`: app object with a new one-time `token`; `404`.
 
 **GET `/api/apps/{id}/evaluate/`**
 - Reads the inverter live (the reading is saved as an energy snapshot) and evaluates the app's policy against it; time rules use the reading's `timestamp`.
@@ -135,7 +125,7 @@ docker compose logs -f inverter-worker
 
 ### Policies
 
-A policy combines rules into one decision and is assigned to apps (see [Registered apps](#registered-apps)). All endpoints are operator-only; rules and policy↔rule links are managed in the Django admin (see [Rules](#rules)).
+A policy combines rules into one decision and is assigned to apps (see [Registered apps](#registered-apps)). Rules are linked to a policy through its `rules` field (or on the policy page in the Django admin); see [Rules](#rules) for the rules themselves.
 
 | Method | URL | Purpose |
 |---|---|---|
@@ -150,7 +140,7 @@ A policy combines rules into one decision and is assigned to apps (see [Register
 |---|---|---|
 | `operator` | `and` / `or` | `and` — every effective rule must pass; `or` — one is enough. Default `and` |
 | `max_concurrent_jobs` | int | Running jobs of the app at the same time (not checked until jobs are connected to apps) |
-| `rules` | list, read-only | Linked rules: `{"rule": {"id", "name", "is_active"}, "is_active", "effective"}`; `is_active` is the link switch, `effective` = link and rule both active |
+| `rules` | list | Linked rules. Written as `{"rule": <rule id>, "is_active": true}` (`is_active` optional, default `true`), read as `{"rule": {"id", "name", "is_active"}, "is_active", "effective"}`; `is_active` is the link switch, `effective` = link and rule both active |
 
 **GET `/api/policies/`**
 - Parameters: `is_active`, `search` (by name), `page`, `page_size`.
@@ -160,8 +150,9 @@ A policy combines rules into one decision and is assigned to apps (see [Register
 - Body:
 ```json
 {"name": "Sunny weekdays", "description": "Daytime surplus only", "is_active": true,
- "operator": "and", "max_concurrent_jobs": 1}
+ "operator": "and", "max_concurrent_jobs": 1, "rules": [{"rule": 1}]}
 ```
+- `rules` is optional (no links when left out); each rule can be linked once.
 - Response `201`: the same object plus `id`, `apps_count`, `rules`, `created_at`, `updated_at`:
 ```json
 {"id": 3, "name": "Sunny weekdays", "description": "Daytime surplus only", "operator": "and",
@@ -169,11 +160,11 @@ A policy combines rules into one decision and is assigned to apps (see [Register
  "rules": [{"rule": {"id": 1, "name": "Sunny", "is_active": true}, "is_active": true, "effective": true}],
  "created_at": "2026-10-11T09:00:00Z", "updated_at": "2026-10-11T09:00:00Z"}
 ```
-- Errors: `400` — duplicate `name`, `operator` other than `and` / `or`, `max_concurrent_jobs` below 1.
+- Errors: `400` — duplicate `name`, `operator` other than `and` / `or`, `max_concurrent_jobs` below 1, an unknown or repeated rule in `rules`.
 
 **GET `/api/policies/{id}/`** — `200` + policy object, `404`.
 
-**PUT / PATCH `/api/policies/{id}/`** — body as in POST (PATCH: any subset; `rules` is ignored); `200` + updated object; `400`; `404`. Setting `"is_active": false` turns the policy off for every app it is assigned to.
+**PUT / PATCH `/api/policies/{id}/`** — body as in POST (PUT needs `name`; PATCH: any subset); `200` + updated object; `400`; `404`. `rules`, when sent, replaces the policy's links (`[]` removes them all; links that stay keep their `created_at`); when left out, the links stay. Setting `"is_active": false` turns the policy off for every app it is assigned to.
 
 **DELETE `/api/policies/{id}/`** — `204`; `404`; `409` — the policy is still assigned to apps (move them to another policy first).
 
@@ -186,9 +177,87 @@ A policy combines rules into one decision and is assigned to apps (see [Register
 
 ---
 
+### Jobs
+
+Operator CRUD over jobs. The OpenAPI 3 contract is [`postman/specs/jobs.yaml`](postman/specs/jobs.yaml). Nothing runs jobs yet: `status` is set by whoever calls the API.
+
+| Method | URL | Purpose |
+|---|---|---|
+| GET | `/api/jobs/` | List jobs |
+| POST | `/api/jobs/` | Create a job |
+| GET | `/api/jobs/{id}/` | Get one job |
+| PUT / PATCH | `/api/jobs/{id}/` | Update a job (e.g. `{"status": "in-process"}`) |
+| DELETE | `/api/jobs/{id}/` | Delete a job |
+
+| Field | Type | Meaning |
+|---|---|---|
+| `app` | int, nullable | Registered app that owns the job; becomes `null` when the app is deleted |
+| `model` | string, max 200 | LLM model name |
+| `data` | list of URLs | Public `http` / `https` URLs of the job input, at least one |
+| `prompt` | string | What to do with the data |
+| `status` | `queued` / `in-process` / `success` / `failed` | Default `queued` |
+
+**GET `/api/jobs/`**
+- Parameters: `status`, `page`, `page_size`.
+- Response `200`: paginated list of job objects, ordered by `id`; `400` — `status` is not one of the four values.
+
+**POST `/api/jobs/`**
+- Body:
+```json
+{"app": 4, "model": "llama3.1:8b",
+ "data": ["https://example.com/docs/report.pdf"],
+ "prompt": "Summarize the document in five bullet points."}
+```
+- Response `201`:
+```json
+{"id": 7, "app": 4, "model": "llama3.1:8b",
+ "data": ["https://example.com/docs/report.pdf"],
+ "prompt": "Summarize the document in five bullet points.", "status": "queued",
+ "created_at": "2026-10-27T09:00:00Z", "updated_at": "2026-10-27T09:00:00Z"}
+```
+- Errors: `400` — missing or empty `model` / `prompt` / `data`, a `data` item that is not an `http(s)` URL (`{"data": {"0": ["Enter a valid URL."]}}`), unknown `status` or `app`.
+
+**GET `/api/jobs/{id}/`** — `200` + job object, `404`.
+
+**PUT / PATCH `/api/jobs/{id}/`** — body as in POST (PUT needs `model`, `data`, `prompt`; PATCH: any subset); `200` + updated object; `400`; `404`.
+
+**DELETE `/api/jobs/{id}/`** — `204`; `404`.
+
+---
+
 ### Rules
 
-Rules have no REST endpoints: they are created in the Django admin (`/admin/director_app/rule/`) with a rule builder that lists the available fields and only offers the operators each field type allows. On the policy page in the admin, rules are linked to the policy (each link has its own `is_active`).
+Operator CRUD over rules. The OpenAPI 3 contract is [`postman/specs/rules.yaml`](postman/specs/rules.yaml). Rules are linked to policies through the policy's `rules` field (see [Policies](#policies)). The Django admin (`/admin/director_app/rule/`) has a rule builder that lists the available fields and only offers the operators each field type allows.
+
+| Method | URL | Purpose |
+|---|---|---|
+| GET | `/api/rules/` | List rules |
+| POST | `/api/rules/` | Create a rule |
+| GET | `/api/rules/{id}/` | Get one rule |
+| PUT / PATCH | `/api/rules/{id}/` | Update a rule (e.g. `{"is_active": false}`) |
+| DELETE | `/api/rules/{id}/` | Delete a rule that no policy uses |
+| POST | `/api/rules/{id}/unlink/` | Remove the rule from every policy |
+
+**GET `/api/rules/`**
+- Parameters: `is_active`, `search` (by name), `page`, `page_size`.
+- Response `200`: paginated list of rule objects, ordered by `id`.
+
+**POST `/api/rules/`**
+- Body (`description` and `is_active` are optional, `is_active` defaults to `true`):
+```json
+{"name": "Sunny", "description": "Solar output above 1.5 kW",
+ "combination": {"ge": [{"field": "solar_power_w"}, 1500]}}
+```
+- Response `201`: the same object plus `id`, `is_active`, `created_at`, `updated_at`.
+- Errors: `400` — empty or duplicate `name`, missing or invalid `combination` (`{"combination": ["and[1].ge[0].field: unknown field 'nope'"]}`).
+
+**GET `/api/rules/{id}/`** — `200` + rule object, `404`.
+
+**PUT / PATCH `/api/rules/{id}/`** — body as in POST (PUT needs `name` and `combination`; PATCH: any subset); `200` + updated object; `400`; `404`. A change applies to every policy the rule is linked to.
+
+**DELETE `/api/rules/{id}/`** — `204`; `404`; `409` — the rule is linked to policies (unlink it first, so a policy's decision does not change silently).
+
+**POST `/api/rules/{id}/unlink/`** — deletes every policy link of the rule; the rule and the policies stay. `204` (also when the rule had no links); `404`.
 
 A rule is stored as a JSON expression tree in `combination`; every operator node is a single-key object `{"op": [arguments]}`:
 
@@ -199,7 +268,7 @@ A rule is stored as a JSON expression tree in `combination`; every operator node
 | membership | `in` | a value and a non-empty list of constants → condition |
 | arithmetic | `add` (+), `sub` (−), `mul` (×), `div` (÷) | two numbers → number |
 
-Operands: `{"field": "<name>"}`, a number, or a string — `"HH:MM"` for time fields, ISO 8601 for `timestamp` (without an offset it is local time). The root must be a condition, every comparison must use at least one field, and both sides must have the same type (number, time or datetime). The admin rejects invalid rules with the path of the bad node, e.g. `and[1].ge[0]: unknown field 'nope'`.
+Operands: `{"field": "<name>"}`, a number, or a string — `"HH:MM"` for time fields, ISO 8601 for `timestamp` (without an offset it is local time). The root must be a condition, every comparison must use at least one field, and both sides must have the same type (number, time or datetime). The API and the admin reject invalid rules with the path of the bad node, e.g. `and[1].ge[0].field: unknown field 'nope'`.
 
 Fields are the fields of the energy reading (`EnergySnapshotSchema`, without `id`) plus two local-time fields; local time is the project `TIME_ZONE` (Europe/Kyiv):
 
@@ -237,5 +306,6 @@ The diagram is rendered from [`docs/db-schema.mmd`](docs/db-schema.mmd):
 
 Relations:
 - one policy → many registered apps (`REGISTERED_APP.policy_id`, nullable; a policy cannot be deleted while apps use it);
-- policies ↔ rules — many-to-many through `POLICY_RULE_RELATION` (`policy_id`, `rule_id`, unique pair). The link has its own `is_active`, and so do every rule and policy; a rule counts for a policy only when the link and the rule are active;
+- policies ↔ rules — many-to-many through `POLICY_RULE_RELATION` (`policy_id`, `rule_id`, unique pair). The link has its own `is_active`, and so do every rule and policy; a rule counts for a policy only when the link and the rule are active. A rule cannot be deleted over the API while it is linked;
+- one registered app → many jobs (`JOB.app_id`, nullable; deleting the app keeps its jobs with `app_id` set to null);
 - `ENERGY_SNAPSHOT` is standalone and append-only: every evaluation reads the inverter live, saves the reading, and evaluates the app's policy against it.
