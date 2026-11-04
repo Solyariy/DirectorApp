@@ -18,3 +18,4 @@ scripts:
       const job = pm.response.json();
       pm.test('New job is queued', () => pm.expect(job.status).to.eql('queued'));
       pm.collectionVariables.set('jobId', job.id);
+examples: './.resources/Create job.resources/examples'

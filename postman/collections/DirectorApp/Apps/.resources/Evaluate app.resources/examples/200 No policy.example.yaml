@@ -1,0 +1,36 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/apps/2/evaluate/'
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "can_run": false,
+        "energy": {
+          "id": 2,
+          "timestamp": "2026-11-04T10:00:00Z",
+          "solar_power_w": 2350,
+          "load_power_w": 640,
+          "grid_power_w": -120,
+          "battery_power_w": -1590,
+          "battery_charge_pct": 78,
+          "battery_voltage_v": 53.2,
+          "grid_voltage_v": 231.4,
+          "pv1_voltage_v": 312.5,
+          "pv1_current_a": 4.1,
+          "pv1_power_w": 1280,
+          "pv2_voltage_v": 298.0,
+          "pv2_current_a": 3.6,
+          "pv2_power_w": 1070,
+          "battery_max_charge_current_a": 60
+        },
+        "policy": null
+      }
+order: 2000

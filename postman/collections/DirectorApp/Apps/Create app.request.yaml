@@ -19,3 +19,4 @@ scripts:
       const app = pm.response.json();
       pm.test('App is created without a policy', () => pm.expect(app.policy).to.eql(null));
       pm.collectionVariables.set('appId', app.id);
+examples: './.resources/Create app.resources/examples'

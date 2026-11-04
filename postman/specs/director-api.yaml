@@ -1,0 +1,1662 @@
+openapi: 3.0.3
+info:
+  title: DirectorApp API
+  version: 0.4.0
+  description: >-
+    Operator API of the LLM Task Director: registered apps, rules, policies,
+    jobs (director_app, `/api/`) and inverter energy readings (inverter_app,
+    `/api/energy/`). All bodies are JSON.
+
+
+    Authentication: every endpoint except `POST /auth/token/` needs an
+    operator token in the `Authorization: Token <key>` header. Get the token
+    from `POST /auth/token/` with a Django user's `username` / `password`
+    (users are created with `manage.py createsuperuser` or the admin). The
+    token does not expire; the same user always gets the same token. A
+    missing or wrong token is `401` with `{"detail": "..."}` and the header
+    `WWW-Authenticate: Token`.
+
+
+    Conventions:
+
+    - Lists are paginated with `page` / `page_size` (default 20, max 100) and
+    return `{count, next, previous, results}`; a page past the end is `404`
+    with `{"detail": "Invalid page."}`.
+
+    - Validation errors are `400` with messages per field
+    (`{"field": ["message"]}`); errors inside a list are keyed by the item
+    index (`{"data": {"0": ["Enter a valid URL."]}}`).
+
+    - Not found is `404` `{"detail": "Not found."}`, state conflicts are
+    `409` `{"detail": "..."}`, an unreachable inverter is `503`
+    `{"detail": "Failed to connect to inverter"}`, an unsupported method is
+    `405` `{"detail": "Method \"DELETE\" not allowed."}`.
+
+    - Every datetime in a response is ISO 8601 UTC with a `Z` suffix (e.g.
+    `2026-11-04T10:00:00Z`, microseconds when stored). Datetimes sent in
+    bodies or the `from` / `to` filters may carry any offset; without one
+    they are read as UTC. Exception: inside a rule `combination` the
+    `weekday` / `local_time` fields and offset-less datetime constants use
+    the server's local time (`Europe/Kyiv`), see `/rules/catalog/`.
+
+    - CORS: browsers may call the API from the origins listed in the
+    server's `CORS_ALLOWED_ORIGINS` (`.env`).
+
+    - Power is in watts, voltage in volts, current in amperes.
+servers:
+  - url: http://127.0.0.1:8000/api
+    description: Local dev server (`uv run python manage.py runserver`)
+security:
+  - TokenAuth: []
+tags:
+  - name: Auth
+    description: Operator login; returns the API token.
+  - name: Apps
+    description: Registered apps; each has at most one policy.
+  - name: Rules
+    description: Reusable conditions over one energy reading.
+  - name: Policies
+    description: Combine linked rules with `and` / `or`.
+  - name: Jobs
+    description: LLM work items; plain records for now (nothing runs them).
+  - name: Energy
+    description: Inverter readings.
+paths:
+  /auth/token/:
+    post:
+      tags: [Auth]
+      operationId: obtainToken
+      summary: Get the operator token
+      description: >-
+        Exchanges a Django user's credentials for its API token (created on
+        first login, then always the same). Needs no token itself.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: The token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '400':
+          description: >-
+            Missing fields or wrong credentials (`non_field_errors`:
+            `Unable to log in with provided credentials.`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                non_field_errors:
+                  - Unable to log in with provided credentials.
+  /apps/:
+    get:
+      tags: [Apps]
+      operationId: listApps
+      summary: List apps
+      parameters:
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated apps, ordered by id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppPage'
+        '404':
+          $ref: '#/components/responses/InvalidPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Apps]
+      operationId: createApp
+      summary: Register an app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppWrite'
+            example:
+              name: doc-indexer
+              description: Nightly embeddings for the home wiki
+              policy: null
+      responses:
+        '201':
+          description: The created app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /apps/{app_id}/:
+    parameters:
+      - $ref: '#/components/parameters/AppId'
+    get:
+      tags: [Apps]
+      operationId: getApp
+      summary: Get one app
+      responses:
+        '200':
+          description: The app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Apps]
+      operationId: replaceApp
+      summary: Replace an app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppWrite'
+      responses:
+        '200':
+          description: The updated app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Apps]
+      operationId: updateApp
+      summary: Update some fields of an app
+      description: '`policy: null` removes the policy.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppPatch'
+            example:
+              policy: 1
+      responses:
+        '200':
+          description: The updated app.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Apps]
+      operationId: deleteApp
+      summary: Delete an app
+      description: The app's jobs stay, with `app` set to null.
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /apps/{app_id}/evaluate/:
+    parameters:
+      - $ref: '#/components/parameters/AppId'
+    get:
+      tags: [Apps]
+      operationId: evaluateApp
+      summary: May the app run now?
+      description: >-
+        Reads the inverter live (the reading is stored as a snapshot) and
+        evaluates the app's policy against it. `can_run` is false and
+        `policy` null when the app has no policy or its policy is inactive.
+        A policy without effective rules does not pass. Every call writes a
+        snapshot, so don't poll it fast.
+      responses:
+        '200':
+          description: The evaluation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppEvaluation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/InverterUnavailable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /rules/:
+    get:
+      tags: [Rules]
+      operationId: listRules
+      summary: List rules
+      parameters:
+        - $ref: '#/components/parameters/IsActive'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated rules, ordered by id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulePage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/InvalidPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Rules]
+      operationId: createRule
+      summary: Create a rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleWrite'
+            example:
+              name: Sunny
+              description: Solar output above 1.5 kW
+              combination:
+                ge:
+                  - field: solar_power_w
+                  - 1500
+      responses:
+        '201':
+          description: The created rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /rules/catalog/:
+    get:
+      tags: [Rules]
+      operationId: getRuleCatalog
+      summary: Fields and operators for building rules
+      description: >-
+        Everything a rule builder needs: the fields a `combination` can read
+        (with their value type) and the operators (with the value types they
+        accept). Derived from the code, so it follows schema changes. Not
+        paginated.
+      responses:
+        '200':
+          description: The catalog.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleCatalog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /rules/{rule_id}/:
+    parameters:
+      - $ref: '#/components/parameters/RuleId'
+    get:
+      tags: [Rules]
+      operationId: getRule
+      summary: Get one rule
+      responses:
+        '200':
+          description: The rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Rules]
+      operationId: replaceRule
+      summary: Replace a rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleWrite'
+      responses:
+        '200':
+          description: The updated rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Rules]
+      operationId: updateRule
+      summary: Update some fields of a rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RulePatch'
+            example:
+              combination:
+                ge:
+                  - field: solar_power_w
+                  - 2000
+      responses:
+        '200':
+          description: The updated rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Rules]
+      operationId: deleteRule
+      summary: Delete a rule
+      description: Refused while the rule is linked to policies.
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The rule is linked to policies; unlink it first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: The rule is linked to policies; unlink it first.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /rules/{rule_id}/unlink/:
+    parameters:
+      - $ref: '#/components/parameters/RuleId'
+    post:
+      tags: [Rules]
+      operationId: unlinkRule
+      summary: Remove the rule from every policy
+      description: >-
+        Deletes all policy links of the rule; the rule and the policies stay.
+        No request body.
+      responses:
+        '204':
+          description: Unlinked (also when the rule had no links).
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /policies/:
+    get:
+      tags: [Policies]
+      operationId: listPolicies
+      summary: List policies
+      parameters:
+        - $ref: '#/components/parameters/IsActive'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated policies, ordered by id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/InvalidPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Policies]
+      operationId: createPolicy
+      summary: Create a policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyWrite'
+            example:
+              name: Sunny weekdays
+              description: Daytime solar only
+              operator: and
+              is_active: true
+              max_concurrent_jobs: 1
+              rules:
+                - rule: 1
+                  is_active: true
+                - rule: 2
+                  is_active: true
+      responses:
+        '201':
+          description: The created policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /policies/{policy_id}/:
+    parameters:
+      - $ref: '#/components/parameters/PolicyId'
+    get:
+      tags: [Policies]
+      operationId: getPolicy
+      summary: Get one policy
+      responses:
+        '200':
+          description: The policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Policies]
+      operationId: replacePolicy
+      summary: Replace a policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyWrite'
+      responses:
+        '200':
+          description: The updated policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Policies]
+      operationId: updatePolicy
+      summary: Update some fields of a policy
+      description: '`rules`, when sent, replaces all links (`[]` removes them).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyPatch'
+            example:
+              rules:
+                - rule: 1
+                  is_active: true
+                - rule: 2
+                  is_active: false
+      responses:
+        '200':
+          description: The updated policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Policies]
+      operationId: deletePolicy
+      summary: Delete a policy
+      description: Refused while apps use the policy. Its rule links are deleted; the rules stay.
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Apps use the policy; move them to another policy first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: The policy is assigned to apps; move them to another policy first.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /policies/{policy_id}/apps/:
+    parameters:
+      - $ref: '#/components/parameters/PolicyId'
+    get:
+      tags: [Policies]
+      operationId: listPolicyApps
+      summary: Apps that use the policy
+      description: Not paginated.
+      responses:
+        '200':
+          description: Apps of the policy, ordered by id.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppBrief'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /jobs/:
+    get:
+      tags: [Jobs]
+      operationId: listJobs
+      summary: List jobs
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Only jobs with this status; any other value is `400`.
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated jobs, ordered by id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/InvalidPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Jobs]
+      operationId: createJob
+      summary: Create a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobWrite'
+            example:
+              app: 1
+              model: llama3.1:8b
+              data:
+                - https://example.com/docs/report.pdf
+              prompt: Summarize the document in five bullet points.
+      responses:
+        '201':
+          description: The created job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /jobs/{job_id}/:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      summary: Get one job
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Jobs]
+      operationId: replaceJob
+      summary: Replace a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobWrite'
+      responses:
+        '200':
+          description: The updated job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Jobs]
+      operationId: updateJob
+      summary: Update some fields of a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPatch'
+            example:
+              status: in-process
+      responses:
+        '200':
+          description: The updated job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Jobs]
+      operationId: deleteJob
+      summary: Delete a job
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /energy/snapshots/:
+    get:
+      tags: [Energy]
+      operationId: listSnapshots
+      summary: Reading history
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on `timestamp` (ISO 8601).
+          schema:
+            type: string
+            format: date-time
+          example: '2026-11-04T00:00:00Z'
+        - name: to
+          in: query
+          required: false
+          description: Inclusive upper bound on `timestamp` (ISO 8601).
+          schema:
+            type: string
+            format: date-time
+          example: '2026-11-04T23:59:59Z'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated snapshots, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnergySnapshotPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/InvalidPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Energy]
+      operationId: createSnapshot
+      summary: Store a reading
+      description: For external collectors; the frontend normally only reads.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnergySnapshotWrite'
+      responses:
+        '201':
+          description: The stored snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnergySnapshot'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /energy/current/:
+    get:
+      tags: [Energy]
+      operationId: getCurrentReading
+      summary: Live reading
+      description: >-
+        Reads the inverter over LAN and stores the reading as a snapshot.
+        For dashboards, prefer the newest item of `/energy/snapshots/`
+        (collected every few minutes) over polling this.
+      responses:
+        '200':
+          description: The live reading.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnergySnapshot'
+        '503':
+          $ref: '#/components/responses/InverterUnavailable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: >-
+        `Token <key>`, the key from `POST /auth/token/` (note the `Token `
+        prefix).
+  parameters:
+    AppId:
+      name: app_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    RuleId:
+      name: rule_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    PolicyId:
+      name: policy_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    Search:
+      name: search
+      in: query
+      required: false
+      description: Case-insensitive substring of `name`.
+      schema:
+        type: string
+    IsActive:
+      name: is_active
+      in: query
+      required: false
+      description: Only active or inactive items; any other value is `400`.
+      schema:
+        type: string
+        enum: ['true', 'false', '1', '0']
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    Unauthorized:
+      description: >-
+        No token (`Authentication credentials were not provided.`) or an
+        unknown one (`Invalid token.`); the response carries
+        `WWW-Authenticate: Token`.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+            example: Token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Authentication credentials were not provided.
+    ValidationError:
+      description: Invalid input; messages per field.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    NotFound:
+      description: The object does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Not found.
+    InvalidPage:
+      description: The page does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Invalid page.
+    InverterUnavailable:
+      description: The inverter could not be read.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Failed to connect to inverter
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+    Messages:
+      type: array
+      items:
+        type: string
+    ValidationError:
+      type: object
+      description: >-
+        Keys are field names (or `non_field_errors`). A value is a list of
+        messages, or, for list fields, an object keyed by item index whose
+        values are messages or nested field errors.
+      additionalProperties:
+        oneOf:
+          - $ref: '#/components/schemas/Messages'
+          - type: object
+            additionalProperties: {}
+      example:
+        operator:
+          - '"xor" is not a valid choice.'
+        rules:
+          '0':
+            rule:
+              - Invalid pk "999" - object does not exist.
+    # Auth
+    TokenRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    Token:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: '40-char hex key for `Authorization: Token <key>`.'
+          example: 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b
+    PageMeta:
+      type: object
+      required: [count, next, previous]
+      properties:
+        count:
+          type: integer
+          description: Total items over all pages.
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+    # Apps
+    AppWrite:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Unique.
+        description:
+          type: string
+          default: ''
+        policy:
+          type: integer
+          nullable: true
+          description: Policy id; null = no policy (the app can't run).
+    AppPatch:
+      type: object
+      description: Any subset of the writable app fields.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+        policy:
+          type: integer
+          nullable: true
+    App:
+      type: object
+      required: [id, name, description, policy, created_at]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        policy:
+          type: integer
+          nullable: true
+          description: Policy id.
+        created_at:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: doc-indexer
+        description: Nightly embeddings for the home wiki
+        policy: 1
+        created_at: '2026-11-04T10:00:00Z'
+    AppBrief:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    AppPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/App'
+    # Evaluation
+    RuleEvaluation:
+      type: object
+      required: [rule, name, passed]
+      properties:
+        rule:
+          type: integer
+          description: Rule id.
+        name:
+          type: string
+        passed:
+          type: boolean
+          description: Unknown (null reading, division by zero) counts as false.
+    PolicyEvaluation:
+      type: object
+      nullable: true
+      description: Null when the app has no active policy.
+      required: [policy, operator, passed, rules]
+      properties:
+        policy:
+          type: integer
+          description: Policy id.
+        operator:
+          $ref: '#/components/schemas/PolicyOperator'
+        passed:
+          type: boolean
+        rules:
+          type: array
+          description: Effective rules only (rule and link active), by id.
+          items:
+            $ref: '#/components/schemas/RuleEvaluation'
+    AppEvaluation:
+      type: object
+      required: [can_run, energy, policy]
+      properties:
+        can_run:
+          type: boolean
+        energy:
+          $ref: '#/components/schemas/EnergySnapshot'
+        policy:
+          $ref: '#/components/schemas/PolicyEvaluation'
+    # Rules
+    Combination:
+      type: object
+      description: >-
+        Expression tree; every operator node is a single-key object
+        `{"op": [arguments]}`.
+
+
+        Operators: logic `and` / `or` (2+ conditions), `not` (1 condition);
+        comparison `eq` / `ne` / `gt` / `ge` / `lt` / `le` (2 operands, one
+        must be a field, both of the same type); membership `in` (field and a
+        non-empty constant list); arithmetic `add` / `sub` / `mul` / `div`
+        (numbers only, usable as comparison operands).
+
+
+        Operands: `{"field": name}`, numbers, or strings typed by the other
+        side (`HH:MM` for time, ISO 8601 for datetime; naive = local time).
+        The root must be a condition (logic, comparison or `in`).
+
+
+        Fields (type): `timestamp` (datetime), `solar_power_w`,
+        `load_power_w`, `grid_power_w` (+ import / − export),
+        `battery_power_w` (+ discharge / − charge), `battery_charge_pct`,
+        `battery_voltage_v`, `grid_voltage_v` (number); nullable numbers
+        `pv1_voltage_v`, `pv1_current_a`, `pv1_power_w`, `pv2_voltage_v`,
+        `pv2_current_a`, `pv2_power_w`, `battery_max_charge_current_a`;
+        `weekday` (number, 0 = Monday … 6 = Sunday, local), `local_time`
+        (time, local). A null field makes the rule fail.
+
+
+        Invalid trees are rejected with `400`; messages start with the node
+        path, e.g. `and[1].ge[0].field: unknown field 'nope'`.
+      example:
+        and:
+          - in:
+              - field: weekday
+              - [0, 1, 2, 3, 4]
+          - ge:
+              - field: local_time
+              - '09:00'
+          - ge:
+              - field: solar_power_w
+              - 1500
+    RuleWrite:
+      type: object
+      required: [name, combination]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Unique.
+        description:
+          type: string
+          default: ''
+        combination:
+          $ref: '#/components/schemas/Combination'
+        is_active:
+          type: boolean
+          default: true
+    RulePatch:
+      type: object
+      description: Any subset of the writable rule fields.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+        combination:
+          $ref: '#/components/schemas/Combination'
+        is_active:
+          type: boolean
+    Rule:
+      type: object
+      required: [id, name, description, combination, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        combination:
+          $ref: '#/components/schemas/Combination'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: Sunny
+        description: Solar output above 1.5 kW
+        combination:
+          ge:
+            - field: solar_power_w
+            - 1500
+        is_active: true
+        created_at: '2026-11-04T10:00:00Z'
+        updated_at: '2026-11-04T10:00:00Z'
+    RuleBrief:
+      type: object
+      required: [id, name, is_active]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_active:
+          type: boolean
+    RuleValueType:
+      type: string
+      enum: [number, time, datetime, bool]
+      description: >-
+        `number` — JSON number; `time` — `"HH:MM"` string, local time;
+        `datetime` — ISO 8601 string (no offset = local time); `bool` — a
+        condition (only logic operators take it).
+    RuleField:
+      type: object
+      required: [name, type, nullable, description]
+      properties:
+        name:
+          type: string
+          description: 'Used as `{"field": name}`.'
+        type:
+          $ref: '#/components/schemas/RuleValueType'
+        nullable:
+          type: boolean
+          description: May be missing on a reading; the rule then fails.
+        description:
+          type: string
+          nullable: true
+    RuleOperator:
+      type: object
+      required: [op, kind, symbol, types]
+      properties:
+        op:
+          type: string
+          description: 'Key of the node, `{"<op>": [arguments]}`.'
+        kind:
+          type: string
+          enum: [logic, comparison, membership, arithmetic]
+          description: >-
+            `logic` — conditions → condition (`not` takes one, `and` / `or`
+            one or more); `comparison` — two values of the same type →
+            condition, one side must use a field; `membership` — a field and
+            a non-empty list of constants → condition; `arithmetic` — two
+            numbers → number.
+        symbol:
+          type: string
+          description: Display symbol, e.g. `≥`.
+        types:
+          type: array
+          description: Value types the operator accepts.
+          items:
+            $ref: '#/components/schemas/RuleValueType'
+    RuleCatalog:
+      type: object
+      required: [fields, operators]
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleField'
+        operators:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleOperator'
+      example:
+        fields:
+          - name: solar_power_w
+            type: number
+            nullable: false
+            description: null
+          - name: pv1_power_w
+            type: number
+            nullable: true
+            description: null
+          - name: weekday
+            type: number
+            nullable: false
+            description: 0 = Monday ... 6 = Sunday, local time
+          - name: local_time
+            type: time
+            nullable: false
+            description: Time of day of the reading, local time
+        operators:
+          - op: and
+            kind: logic
+            symbol: AND
+            types: [bool]
+          - op: ge
+            kind: comparison
+            symbol: '≥'
+            types: [number, time, datetime]
+          - op: in
+            kind: membership
+            symbol: in
+            types: [number, time]
+          - op: add
+            kind: arithmetic
+            symbol: '+'
+            types: [number]
+    RulePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/Rule'
+    # Policies
+    PolicyOperator:
+      type: string
+      enum: [and, or]
+      description: How the results of the effective rules are combined.
+    PolicyRuleLinkWrite:
+      type: object
+      required: [rule]
+      properties:
+        rule:
+          type: integer
+          description: Rule id; each rule at most once per policy.
+        is_active:
+          type: boolean
+          default: true
+    PolicyRuleLink:
+      type: object
+      required: [rule, is_active, effective]
+      properties:
+        rule:
+          $ref: '#/components/schemas/RuleBrief'
+        is_active:
+          type: boolean
+          description: The link itself is on.
+        effective:
+          type: boolean
+          description: Link and rule are both active; only effective rules are evaluated.
+    PolicyWrite:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Unique.
+        description:
+          type: string
+          default: ''
+        operator:
+          allOf:
+            - $ref: '#/components/schemas/PolicyOperator'
+          default: and
+        is_active:
+          type: boolean
+          default: true
+        max_concurrent_jobs:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Stored, not enforced yet.
+        rules:
+          type: array
+          description: Replaces all rule links when sent; left out, links stay.
+          items:
+            $ref: '#/components/schemas/PolicyRuleLinkWrite'
+    PolicyPatch:
+      type: object
+      description: Any subset of the writable policy fields.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+        operator:
+          $ref: '#/components/schemas/PolicyOperator'
+        is_active:
+          type: boolean
+        max_concurrent_jobs:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyRuleLinkWrite'
+    Policy:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - operator
+        - is_active
+        - max_concurrent_jobs
+        - apps_count
+        - rules
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        operator:
+          $ref: '#/components/schemas/PolicyOperator'
+        is_active:
+          type: boolean
+        max_concurrent_jobs:
+          type: integer
+          nullable: true
+        apps_count:
+          type: integer
+          description: Apps that use the policy.
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyRuleLink'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: Sunny weekdays
+        description: Daytime solar only
+        operator: and
+        is_active: true
+        max_concurrent_jobs: 1
+        apps_count: 1
+        rules:
+          - rule:
+              id: 1
+              name: Sunny
+              is_active: true
+            is_active: true
+            effective: true
+        created_at: '2026-11-04T10:00:00Z'
+        updated_at: '2026-11-04T10:00:00Z'
+    PolicyPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/Policy'
+    # Jobs
+    JobStatus:
+      type: string
+      enum: [queued, in-process, success, failed]
+    JobUrls:
+      type: array
+      description: Public http(s) URLs of the job input.
+      minItems: 1
+      items:
+        type: string
+        format: uri
+        maxLength: 2048
+    JobWrite:
+      type: object
+      required: [model, data, prompt]
+      properties:
+        app:
+          type: integer
+          nullable: true
+          description: Id of the registered app that owns the job.
+        model:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: LLM model name.
+        data:
+          $ref: '#/components/schemas/JobUrls'
+        prompt:
+          type: string
+          minLength: 1
+        status:
+          allOf:
+            - $ref: '#/components/schemas/JobStatus'
+          default: queued
+    JobPatch:
+      type: object
+      description: Any subset of the writable job fields.
+      properties:
+        app:
+          type: integer
+          nullable: true
+        model:
+          type: string
+          minLength: 1
+          maxLength: 200
+        data:
+          $ref: '#/components/schemas/JobUrls'
+        prompt:
+          type: string
+          minLength: 1
+        status:
+          $ref: '#/components/schemas/JobStatus'
+    Job:
+      type: object
+      required: [id, app, model, data, prompt, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        app:
+          type: integer
+          nullable: true
+          description: App id; becomes null when the app is deleted.
+        model:
+          type: string
+        data:
+          $ref: '#/components/schemas/JobUrls'
+        prompt:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        app: 1
+        model: llama3.1:8b
+        data:
+          - https://example.com/docs/report.pdf
+        prompt: Summarize the document in five bullet points.
+        status: queued
+        created_at: '2026-11-04T10:00:00Z'
+        updated_at: '2026-11-04T10:00:00Z'
+    JobPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/Job'
+    # Energy
+    EnergySnapshotWrite:
+      type: object
+      required:
+        - timestamp
+        - solar_power_w
+        - load_power_w
+        - grid_power_w
+        - battery_power_w
+        - battery_charge_pct
+        - battery_voltage_v
+        - grid_voltage_v
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        solar_power_w:
+          type: integer
+        load_power_w:
+          type: integer
+        grid_power_w:
+          type: integer
+          description: Positive = import from the grid, negative = export.
+        battery_power_w:
+          type: integer
+          description: Positive = discharging, negative = charging.
+        battery_charge_pct:
+          type: integer
+        battery_voltage_v:
+          type: number
+        grid_voltage_v:
+          type: number
+        pv1_voltage_v:
+          type: number
+          nullable: true
+        pv1_current_a:
+          type: number
+          nullable: true
+        pv1_power_w:
+          type: integer
+          nullable: true
+        pv2_voltage_v:
+          type: number
+          nullable: true
+        pv2_current_a:
+          type: number
+          nullable: true
+        pv2_power_w:
+          type: integer
+          nullable: true
+        battery_max_charge_current_a:
+          type: integer
+          nullable: true
+      example:
+        timestamp: '2026-11-04T10:00:00Z'
+        solar_power_w: 2350
+        load_power_w: 640
+        grid_power_w: -120
+        battery_power_w: -1590
+        battery_charge_pct: 78
+        battery_voltage_v: 53.2
+        grid_voltage_v: 231.4
+        pv1_voltage_v: 312.5
+        pv1_current_a: 4.1
+        pv1_power_w: 1280
+        pv2_voltage_v: 298.0
+        pv2_current_a: 3.6
+        pv2_power_w: 1070
+        battery_max_charge_current_a: 60
+    EnergySnapshot:
+      description: >-
+        One inverter reading. The `pv*` and `battery_max_charge_current_a`
+        fields are null on old readings.
+      allOf:
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+        - $ref: '#/components/schemas/EnergySnapshotWrite'
+        - type: object
+          required:
+            - pv1_voltage_v
+            - pv1_current_a
+            - pv1_power_w
+            - pv2_voltage_v
+            - pv2_current_a
+            - pv2_power_w
+            - battery_max_charge_current_a
+      example:
+        id: 1
+        timestamp: '2026-11-04T10:00:00Z'
+        solar_power_w: 2350
+        load_power_w: 640
+        grid_power_w: -120
+        battery_power_w: -1590
+        battery_charge_pct: 78
+        battery_voltage_v: 53.2
+        grid_voltage_v: 231.4
+        pv1_voltage_v: 312.5
+        pv1_current_a: 4.1
+        pv1_power_w: 1280
+        pv2_voltage_v: 298.0
+        pv2_current_a: 3.6
+        pv2_power_w: 1070
+        battery_max_charge_current_a: 60
+    EnergySnapshotPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/EnergySnapshot'

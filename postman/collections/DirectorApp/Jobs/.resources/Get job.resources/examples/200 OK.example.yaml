@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/jobs/1/'
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 1,
+        "app": 1,
+        "model": "llama3.1:8b",
+        "data": [
+          "https://example.com/docs/report.pdf"
+        ],
+        "prompt": "Summarize the document in five bullet points.",
+        "status": "queued",
+        "created_at": "2026-11-04T10:00:00Z",
+        "updated_at": "2026-11-04T10:00:00Z"
+      }
+order: 1000

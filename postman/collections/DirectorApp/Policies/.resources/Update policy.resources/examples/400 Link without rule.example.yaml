@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/policies/1/'
+  method: PATCH
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "rules": {
+          "0": {
+            "rule": [
+              "This field is required."
+            ]
+          }
+        }
+      }
+order: 2000

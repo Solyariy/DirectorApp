@@ -18,3 +18,4 @@ scripts:
     code: |-
       pm.test('Status is 200', () => pm.response.to.have.status(200));
       pm.test('Combination updated', () => pm.expect(pm.response.json().combination).to.eql({ge: [{field: 'solar_power_w'}, 2000]}));
+examples: './.resources/Update rule.resources/examples'

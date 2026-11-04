@@ -1,0 +1,17 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/apps/?page=9'
+  method: GET
+response:
+  statusCode: 404
+  statusText: Not Found
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Invalid page."
+      }
+order: 2000

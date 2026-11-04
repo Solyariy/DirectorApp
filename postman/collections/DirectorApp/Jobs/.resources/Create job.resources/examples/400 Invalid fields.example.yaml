@@ -1,0 +1,31 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/jobs/'
+  method: POST
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "model": [
+          "This field is required."
+        ],
+        "data": {
+          "0": [
+            "Enter a valid URL."
+          ],
+          "1": [
+            "Enter a valid URL.",
+            "Enter a valid URL."
+          ]
+        },
+        "prompt": [
+          "This field may not be blank."
+        ]
+      }
+order: 2000

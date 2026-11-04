@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from src.director_app.evaluation import evaluate_app
 from src.director_app.models import Job, Policy, RegisteredApp, Rule
+from src.director_app.rules import catalog
 from src.director_app.serializers import (
     AppBriefSerializer,
     JobSerializer,
@@ -155,6 +156,11 @@ class RuleListView(OperatorAPIView):
             serializer.data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class RuleCatalogView(OperatorAPIView):
+    def get(self, request):
+        return Response(catalog())
 
 
 class RuleDetailView(OperatorAPIView):

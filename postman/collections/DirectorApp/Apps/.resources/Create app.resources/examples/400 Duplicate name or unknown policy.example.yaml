@@ -1,0 +1,22 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/apps/'
+  method: POST
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "name": [
+          "registered app with this name already exists."
+        ],
+        "policy": [
+          "Invalid pk \"999\" - object does not exist."
+        ]
+      }
+order: 2000

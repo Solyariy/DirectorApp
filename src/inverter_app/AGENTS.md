@@ -8,7 +8,7 @@
 ## Ownership
 
 - `models.py` — `EnergySnapshot` (`timestamp`, `solar_power_w`, `load_power_w`, `grid_power_w`, `battery_power_w`, `battery_charge_pct`, `battery_voltage_v`, `grid_voltage_v`; nullable `pv1_/pv2_voltage_v`, `_current_a`, `_power_w`, `battery_max_charge_current_a` — null on rows recorded before they were read)
-- `serializers.py` — `EnergySnapshotSerializer` (all fields)
+- `serializers.py` — `EnergySnapshotSerializer` (all fields, `UTCModelSerializer`: `timestamp` rendered in UTC)
 - `schemas.py` — `EnergySnapshotSchema` (pydantic, `from_attributes`): DTO other apps use for snapshots; `PvSiteSchema` (array location, tilt, compass azimuth, peak W, performance ratio)
 - `curtailment.py` — `classify(snapshot, mpp_voltages) -> PvState` (`dark` / `unconstrained` / `curtailed` / `unknown`) and `estimate_mpp_voltages(snapshots)`: per-string reference MPP voltage = median voltage while the battery had headroom. Unconstrained = battery charging below 90% of its limit and < 95% SOC, or strings at MPP voltage; curtailed = string voltage > 1.08 × reference (Deye moves toward Voc when curtailing). Thresholds are proof-of-concept constants
 - `irradiance.py` — proof of concept: `get_pv_site()` (`PV_SITE_*` env, read lazily, `ImproperlyConfigured` if missing), `fetch_satellite_gti()` (Open-Meteo Satellite Radiation API, `global_tilted_irradiance_instant`, native 10-15 min, UTC), `clear_sky_gti()` (pvlib Ineichen → plane of array), `gti_to_power_w()`
@@ -17,7 +17,7 @@
   - `compare_pv_estimate --date --reference-days --csv` — one day of snapshots vs satellite estimate and clear-sky ceiling; calibrates the performance ratio on unconstrained rows, reports bias/MAE and estimated unused PV while curtailed
 - `scripts.py` — `read_latest_energy_and_save()`: live read + persisted `EnergySnapshot`; entry point for other apps
 - `views.py` / `urls.py`:
-  - `GET snapshots/` — newest first, `from`/`to` ISO 8601 filters (`400` on bad datetime), `PageNumberPagination` (`page_size` 20, max 100)
+  - `GET snapshots/` — newest first, `from`/`to` inclusive ISO 8601 filters (offset-less = UTC, `400` on bad datetime), `PageNumberPagination` (`page_size` 20, max 100)
   - `POST snapshots/` — create snapshot, `201`
   - `GET current/` — live read from inverter via `scripts.read_latest_energy_and_save()`, persists and returns the snapshot; `503` when inverter unreachable (`OSError`, `V5FrameError`, `NoSocketAvailableError`)
 - `inverter_service/`:
@@ -36,7 +36,8 @@
 - `InverterStats` field names must match `EnergySnapshot` fields: `current/` does `EnergySnapshot.objects.create(**asdict(stats))`
 - Register mapping changes belong in `InverterManager._format_registers_response`
 - `inverter_service/settings.py` runs `int(os.getenv("INVERTER_LOGGER_SERIAL"))` at import; since `views.py` imports the provider, a missing `.env` key breaks Django startup
-- Implementation field names and the `current/` error code (`503`) differ from README.md (`ts`, `solar_w`, `load_w`, `battery_pct`, `grid_w`; `404`); reconcile one or the other when touching this API
+- `/api/energy/` views need the operator token like every API view (global `REST_FRAMEWORK` defaults; tests use `src.utils.testing.operator_client()`); the inverter-worker settings have no DRF, so the collector command is unaffected
+- `postman/specs/director-api.yaml` and README.md document the implemented field names; keep both in sync with `/api/energy/` changes
 
 ## Work Guidance
 

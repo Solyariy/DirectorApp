@@ -1,3 +1,6 @@
+from datetime import UTC
+
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import pagination, status, views
 from rest_framework.exceptions import ValidationError
@@ -47,6 +50,9 @@ class EnergySnapshotListView(views.APIView):
                 raise ValidationError(
                     {param: ["Enter a valid ISO 8601 datetime."]}
                 )
+            # Like request bodies: no offset means UTC.
+            if timezone.is_naive(value):
+                value = timezone.make_aware(value, UTC)
             queryset = queryset.filter(**{lookup: value})
         return queryset
 

@@ -12,6 +12,8 @@
   - `annotations.py` — pydantic-annotated `NewType`s (`StrUUID`, `LocalFilePath`, `Timestamp`)
   - `order.py` — UTC/Kyiv `datetime` helpers, `get_uuid_str()`, `get_log_id()` (lazily sets the `LOG_ID` context var)
   - `db.py` — `APPS_SCHEMA` and `apps_table(name)`, the schema-qualified `db_table` for app models
+  - `testing.py` — `operator_client()`: a test `APIClient` with a real operator `Token` (creates the user); used by API tests of every app
+  - `serializers.py` — `UTCDateTimeField` (DRF, renders UTC `Z`, offset-less input = UTC) and `UTCModelSerializer` (maps model `DateTimeField` to it); imports DRF, so the inverter-worker path must not import it
   - `logs.py` — structlog setup; `Logger` (static `info/debug/warning/error`, adds caller name, file:line and `log_id`; ANSI colors off when `NO_COLOR` is set) and `LoggerMixin` (`log_info/log_warning/log_error` prefixed with class name)
 - `settings.py` — `LOG_ID` `ContextVar` shared by logging utils (not Django settings)
 
@@ -27,7 +29,7 @@
 ## Work Guidance
 
 - DTOs: pydantic models in a `schemas.py` next to the consuming module
-- DRF serializers in the app's `serializers.py`, views as `APIView` classes in `views.py`, routes in the app's `urls.py`
+- DRF serializers in the app's `serializers.py`, subclassing `src.utils.serializers.UTCModelSerializer` (API datetimes are UTC), views as `APIView` classes in `views.py`, routes in the app's `urls.py`
 
 ## Verification
 
