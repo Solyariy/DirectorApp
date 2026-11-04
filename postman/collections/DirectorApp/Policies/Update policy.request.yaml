@@ -1,0 +1,24 @@
+$kind: http-request
+description: 'PATCH takes any subset of the POST body; PUT needs `name`. `rules`, when sent, replaces the links (`[]` removes all).'
+method: PATCH
+url: '{{baseUrl}}/policies/:policy_id/'
+order: 4000
+pathVariables:
+  - key: policy_id
+    value: '{{policyId}}'
+body:
+  type: json
+  content: |-
+    {
+      "rules": [{"rule": {{ruleId}}, "is_active": false}]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      pm.test('Rule link is switched off', () => {
+        const [link] = pm.response.json().rules;
+        pm.expect(link.is_active).to.eql(false);
+        pm.expect(link.effective).to.eql(false);
+      });

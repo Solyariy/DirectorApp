@@ -1,0 +1,19 @@
+$kind: http-request
+method: PATCH
+url: '{{baseUrl}}/jobs/:job_id/'
+order: 4000
+pathVariables:
+  - key: job_id
+    value: '{{jobId}}'
+body:
+  type: json
+  content: |-
+    {
+      "status": "in-process"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      pm.test('Status updated', () => pm.expect(pm.response.json().status).to.eql('in-process'));

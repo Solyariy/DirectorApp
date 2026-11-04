@@ -1,0 +1,3 @@
+$kind: collection
+description: 'LLM jobs (director_app, `/api/jobs/`). Contract: `postman/specs/jobs.yaml`. Run `Create job` first; it stores the new id in `jobId`.'
+order: 3000

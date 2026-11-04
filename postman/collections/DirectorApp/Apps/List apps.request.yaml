@@ -1,0 +1,22 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/apps/'
+order: 1000
+queryParams:
+  - key: search
+    value: ''
+    description: 'Case-insensitive name filter'
+    disabled: true
+  - key: page
+    value: '1'
+    description: 'Page number'
+    disabled: true
+  - key: page_size
+    value: '20'
+    description: 'Page size, max 100'
+    disabled: true
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
