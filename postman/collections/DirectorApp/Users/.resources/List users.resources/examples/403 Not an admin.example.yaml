@@ -1,0 +1,17 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/users/'
+  method: GET
+response:
+  statusCode: 403
+  statusText: Forbidden
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "You do not have permission to perform this action."
+      }
+order: 2000

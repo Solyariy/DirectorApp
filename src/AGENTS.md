@@ -6,13 +6,15 @@
 
 ## Ownership
 
+- `accounts_app/` — registration, login/logout, users and roles (see child doc)
 - `inverter_app/` — energy system status (see child doc)
 - `director_app/` — registered apps, rules, policies, policy evaluation, jobs (see child doc)
 - `utils/` — shared helpers:
   - `annotations.py` — pydantic-annotated `NewType`s (`StrUUID`, `LocalFilePath`, `Timestamp`)
   - `order.py` — UTC/Kyiv `datetime` helpers, `get_uuid_str()`, `get_log_id()` (lazily sets the `LOG_ID` context var)
   - `db.py` — `APPS_SCHEMA` and `apps_table(name)`, the schema-qualified `db_table` for app models
-  - `testing.py` — `operator_client()`: a test `APIClient` with a real operator `Token` (creates the user); used by API tests of every app
+  - `permissions.py` — `is_admin(user)` (`is_staff`), `IsAdminOrReadOnly` (global DRF default: authenticated, safe methods for all, writes admin only), `IsAdmin` (admin-only views); imports DRF, keep it off the inverter-worker path
+  - `testing.py` — `operator_client(username, admin=True)`: a test `APIClient` with a real `Token` for a new admin (staff) or read-only user; used by API tests of every app
   - `serializers.py` — `UTCDateTimeField` (DRF, renders UTC `Z`, offset-less input = UTC) and `UTCModelSerializer` (maps model `DateTimeField` to it); imports DRF, so the inverter-worker path must not import it
   - `logs.py` — structlog setup; `Logger` (static `info/debug/warning/error`, adds caller name, file:line and `log_id`; ANSI colors off when `NO_COLOR` is set) and `LoggerMixin` (`log_info/log_warning/log_error` prefixed with class name)
 - `settings.py` — `LOG_ID` `ContextVar` shared by logging utils (not Django settings)
@@ -39,5 +41,6 @@
 
 ## Child DOX Index
 
+- `accounts_app/AGENTS.md` — register / token login / logout, `/api/users/` role management, role rules (`admin` = staff, `user` = read-only)
 - `director_app/AGENTS.md` — `Rule` expressions, CRUD + admin rule builder, `Policy` (`and`/`or` over rules), `PolicyRuleRelation`, `RegisteredApp` (one policy), `Job` CRUD, policy evaluation, planned `JobConsumption`
 - `inverter_app/AGENTS.md` — `EnergySnapshot` ledger model, `/api/energy/` endpoints, `inverter_service/` Solarman V5 client, curtailment classification, irradiance proof of concept, snapshot collector command

@@ -1,20 +1,30 @@
 openapi: 3.0.3
 info:
   title: DirectorApp API
-  version: 0.4.0
+  version: 0.5.0
   description: >-
     Operator API of the LLM Task Director: registered apps, rules, policies,
     jobs (director_app, `/api/`) and inverter energy readings (inverter_app,
     `/api/energy/`). All bodies are JSON.
 
 
-    Authentication: every endpoint except `POST /auth/token/` needs an
-    operator token in the `Authorization: Token <key>` header. Get the token
-    from `POST /auth/token/` with a Django user's `username` / `password`
-    (users are created with `manage.py createsuperuser` or the admin). The
-    token does not expire; the same user always gets the same token. A
+    Authentication: every endpoint except `POST /auth/register/` and `POST
+    /auth/token/` needs a token in the `Authorization: Token <key>` header.
+    Register with `POST /auth/register/` (always role `user`), log in with
+    `POST /auth/token/` to get the token, end it with `POST /auth/logout/`
+    (deletes the user's one token, so every session of that user ends; the
+    next login issues a new one). The token does not expire otherwise. A
     missing or wrong token is `401` with `{"detail": "..."}` and the header
     `WWW-Authenticate: Token`.
+
+
+    Roles: `admin` may call everything; `user` is read-only: `GET` only,
+    except `GET /apps/{app_id}/evaluate/` and `GET /energy/current/` (they
+    read the inverter live and store a snapshot) and `/users/`, which are
+    admin-only. A forbidden call is `403` `{"detail": "You do not have
+    permission to perform this action."}`. Admins change roles at
+    `/users/{user_id}/`; the first admin comes from `manage.py
+    createsuperuser`.
 
 
     Conventions:
@@ -50,7 +60,9 @@ security:
   - TokenAuth: []
 tags:
   - name: Auth
-    description: Operator login; returns the API token.
+    description: Registration, login (token) and logout.
+  - name: Users
+    description: Accounts and their roles; admin only.
   - name: Apps
     description: Registered apps; each has at most one policy.
   - name: Rules
@@ -95,6 +107,138 @@ paths:
               example:
                 non_field_errors:
                   - Unable to log in with provided credentials.
+  /auth/register/:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Register an account
+      description: >-
+        Open sign-up. Always creates role `user` (read-only); a `role` in
+        the body is ignored. The password must pass Django's password
+        validators (length 8+, not common, not numeric only, not like the
+        username). Needs no token; does not log in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Register'
+      responses:
+        '201':
+          description: The new account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /auth/logout/:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Log out
+      description: >-
+        Deletes the caller's token. The token is shared by all of the
+        user's sessions, so all of them end. Any role.
+      responses:
+        '204':
+          description: Logged out; the token no longer works.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /users/:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List users
+      parameters:
+        - name: search
+          in: query
+          description: Case-insensitive substring of `username`.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated users, ordered by id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '404':
+          $ref: '#/components/responses/InvalidPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/{user_id}/:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get a user
+      responses:
+        '200':
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [Users]
+      operationId: updateUserRole
+      summary: Change a user's role
+      description: >-
+        Only `role` is writable (`username` is read-only and ignored). An
+        admin can't change their own role (`409`), so at least one admin
+        always remains. The change applies on the user's next request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdate'
+      responses:
+        '200':
+          description: The updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SelfChange'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Users]
+      operationId: deleteUser
+      summary: Delete a user
+      description: Deletes the account and its token. Not yourself (`409`).
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SelfChange'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /apps/:
     get:
       tags: [Apps]
@@ -140,6 +284,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /apps/{app_id}/:
     parameters:
       - $ref: '#/components/parameters/AppId'
@@ -181,6 +327,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     patch:
       tags: [Apps]
       operationId: updateApp
@@ -207,6 +355,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Apps]
       operationId: deleteApp
@@ -219,6 +369,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /apps/{app_id}/evaluate/:
     parameters:
       - $ref: '#/components/parameters/AppId'
@@ -245,6 +397,8 @@ paths:
           $ref: '#/components/responses/InverterUnavailable'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /rules/:
     get:
       tags: [Rules]
@@ -296,6 +450,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /rules/catalog/:
     get:
       tags: [Rules]
@@ -356,6 +512,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     patch:
       tags: [Rules]
       operationId: updateRule
@@ -384,6 +542,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Rules]
       operationId: deleteRule
@@ -404,6 +564,8 @@ paths:
                 detail: The rule is linked to policies; unlink it first.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /rules/{rule_id}/unlink/:
     parameters:
       - $ref: '#/components/parameters/RuleId'
@@ -421,6 +583,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /policies/:
     get:
       tags: [Policies]
@@ -476,6 +640,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /policies/{policy_id}/:
     parameters:
       - $ref: '#/components/parameters/PolicyId'
@@ -517,6 +683,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     patch:
       tags: [Policies]
       operationId: updatePolicy
@@ -547,6 +715,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Policies]
       operationId: deletePolicy
@@ -567,6 +737,8 @@ paths:
                 detail: The policy is assigned to apps; move them to another policy first.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /policies/{policy_id}/apps/:
     parameters:
       - $ref: '#/components/parameters/PolicyId'
@@ -642,6 +814,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /jobs/{job_id}/:
     parameters:
       - $ref: '#/components/parameters/JobId'
@@ -683,6 +857,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     patch:
       tags: [Jobs]
       operationId: updateJob
@@ -708,6 +884,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     delete:
       tags: [Jobs]
       operationId: deleteJob
@@ -719,6 +897,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /energy/snapshots/:
     get:
       tags: [Energy]
@@ -778,6 +958,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /energy/current/:
     get:
       tags: [Energy]
@@ -798,6 +980,8 @@ paths:
           $ref: '#/components/responses/InverterUnavailable'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     TokenAuth:
@@ -808,6 +992,12 @@ components:
         `Token <key>`, the key from `POST /auth/token/` (note the `Token `
         prefix).
   parameters:
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: integer
     AppId:
       name: app_id
       in: path
@@ -881,6 +1071,24 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             detail: Authentication credentials were not provided.
+    Forbidden:
+      description: >-
+        The caller's role may not do this (role `user` on a write, a live
+        inverter read or `/users/`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: You do not have permission to perform this action.
+    SelfChange:
+      description: An admin tried to change their own role or delete themselves.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: You can't change your own role or delete yourself.
     ValidationError:
       description: Invalid input; messages per field.
       content:
@@ -958,6 +1166,50 @@ components:
           type: string
           description: '40-char hex key for `Authorization: Token <key>`.'
           example: 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b
+    Role:
+      type: string
+      enum: [admin, user]
+      description: '`admin`: everything; `user`: read-only.'
+    User:
+      type: object
+      required: [id, username, role]
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        role:
+          $ref: '#/components/schemas/Role'
+    UserRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: '#/components/schemas/Role'
+    UserPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+    Register:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          maxLength: 150
+          description: Letters, digits and `@.+-_`; unique.
+        password:
+          type: string
+          format: password
+          writeOnly: true
     PageMeta:
       type: object
       required: [count, next, previous]

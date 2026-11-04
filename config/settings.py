@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
+    "src.accounts_app",
     "src.inverter_app",
     "src.director_app",
     "django.contrib.admin",
@@ -75,14 +76,15 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_URLS_REGEX = r"^/api/.*$"
 
-# Every API endpoint needs an operator token ("Authorization: Token <key>"),
-# obtained from POST /api/auth/token/ with a Django user's credentials.
+# Every API endpoint needs a token ("Authorization: Token <key>") from
+# POST /api/auth/token/. Role admin (is_staff) may do anything, role user
+# only reads (safe methods); views override this for open/admin-only cases.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "src.utils.permissions.IsAdminOrReadOnly",
     ],
 }
 

@@ -13,6 +13,7 @@ from src.director_app.serializers import (
     RuleSerializer,
 )
 from src.inverter_app.scripts import read_latest_energy_and_save
+from src.utils.permissions import IsAdmin
 
 
 class DirectorPagination(pagination.PageNumberPagination):
@@ -117,6 +118,9 @@ class RegisteredAppDetailView(OperatorAPIView):
 
 
 class AppEvaluateView(OperatorAPIView):
+    # A GET, but it reads the inverter live and stores a snapshot.
+    permission_classes = [IsAdmin]
+
     def get(self, request, app_id):
         app = self.get_or_404(
             RegisteredApp.objects.select_related("policy"),

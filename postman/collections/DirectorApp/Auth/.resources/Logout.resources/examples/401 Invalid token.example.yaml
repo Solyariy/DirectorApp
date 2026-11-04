@@ -1,0 +1,19 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/auth/logout/'
+  method: POST
+response:
+  statusCode: 401
+  statusText: Unauthorized
+  headers:
+    - key: Content-Type
+      value: application/json
+    - key: WWW-Authenticate
+      value: Token
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Invalid token."
+      }
+order: 2000

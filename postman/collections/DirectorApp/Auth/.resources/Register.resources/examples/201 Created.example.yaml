@@ -1,0 +1,19 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/auth/register/'
+  method: POST
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 2,
+        "username": "reader",
+        "role": "user"
+      }
+order: 1000

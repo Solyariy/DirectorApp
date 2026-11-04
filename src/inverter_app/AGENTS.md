@@ -36,7 +36,7 @@
 - `InverterStats` field names must match `EnergySnapshot` fields: `current/` does `EnergySnapshot.objects.create(**asdict(stats))`
 - Register mapping changes belong in `InverterManager._format_registers_response`
 - `inverter_service/settings.py` runs `int(os.getenv("INVERTER_LOGGER_SERIAL"))` at import; since `views.py` imports the provider, a missing `.env` key breaks Django startup
-- `/api/energy/` views need the operator token like every API view (global `REST_FRAMEWORK` defaults; tests use `src.utils.testing.operator_client()`); the inverter-worker settings have no DRF, so the collector command is unaffected
+- `/api/energy/` views use the global token auth + roles (role `user` reads snapshots; `POST snapshots/` is admin only); `EnergyCurrentView` is `IsAdmin` (live inverter read + snapshot write); tests use `src.utils.testing.operator_client()`; the inverter-worker settings have no DRF, so the collector command is unaffected
 - `postman/specs/director-api.yaml` and README.md document the implemented field names; keep both in sync with `/api/energy/` changes
 
 ## Work Guidance

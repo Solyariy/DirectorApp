@@ -1,0 +1,31 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/users/'
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "count": 2,
+        "next": null,
+        "previous": null,
+        "results": [
+          {
+            "id": 1,
+            "username": "admin",
+            "role": "admin"
+          },
+          {
+            "id": 2,
+            "username": "reader",
+            "role": "user"
+          }
+        ]
+      }
+order: 1000

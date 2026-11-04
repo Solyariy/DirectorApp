@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from src.inverter_app.models import EnergySnapshot
 from src.inverter_app.scripts import read_latest_energy_and_save
 from src.inverter_app.serializers import EnergySnapshotSerializer
+from src.utils.permissions import IsAdmin
 
 
 class SnapshotPagination(pagination.PageNumberPagination):
@@ -58,6 +59,9 @@ class EnergySnapshotListView(views.APIView):
 
 
 class EnergyCurrentView(views.APIView):
+    # A GET, but it reads the inverter live and stores a snapshot.
+    permission_classes = [IsAdmin]
+
     def get(self, request):
         try:
             snapshot = read_latest_energy_and_save()

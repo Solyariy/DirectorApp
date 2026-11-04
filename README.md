@@ -32,7 +32,12 @@ uv run python manage.py runserver   # http://127.0.0.1:8000/api/
 - **Contract**: [`postman/specs/director-api.yaml`](postman/specs/director-api.yaml) (OpenAPI 3.0) describes every endpoint, schema and error shape. Generate a typed client from it, e.g. `npx openapi-typescript postman/specs/director-api.yaml -o src/api/schema.d.ts`.
 - **Examples**: the Postman collection `postman/collections/DirectorApp` (open the `postman/` folder in the Postman app) has a request with saved example responses for every endpoint, captured from the real API.
 - **CORS**: list the frontend's origins in `.env` as `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173` (comma-separated `scheme://host[:port]`, applies to `/api/` only), then restart the server. A dev-server proxy works too.
-- **Auth**: every `/api/` endpoint needs an operator token: `POST /api/auth/token/` with `{"username", "password"}` of a Django user (`uv run python manage.py createsuperuser`) returns `{"token": "<key>"}`; send it as `Authorization: Token <key>` (the `Authorization` header is allowed by CORS). The token never expires and is the same on every login. Without a valid token the API answers `401` (`{"detail": "Authentication credentials were not provided."}` or `{"detail": "Invalid token."}`, header `WWW-Authenticate: Token`). Wrong credentials on login are `400` (`non_field_errors`).
+- **Auth**:
+  - `POST /api/auth/register/` `{"username", "password"}` creates a read-only account (`201 {"id", "username", "role": "user"}`; Django password validators apply).
+  - `POST /api/auth/token/` with the same fields returns `{"token": "<key>"}` (wrong credentials: `400 non_field_errors`); send it as `Authorization: Token <key>` (allowed by CORS). The token is the same on every login and never expires.
+  - `POST /api/auth/logout/` deletes the token (`204`); every session of that user ends and the next login gets a new token.
+  - Without a valid token every other endpoint answers `401` (`{"detail": "Authentication credentials were not provided."}` / `{"detail": "Invalid token."}`, header `WWW-Authenticate: Token`).
+- **Roles**: `admin` (Django `is_staff`; the first one from `uv run python manage.py createsuperuser`) may call everything. `user` is read-only: `GET` only, and not `/apps/{id}/evaluate/`, `/energy/current/` (live inverter reads that store a snapshot) or `/users/`. Forbidden calls are `403 {"detail": "You do not have permission to perform this action."}`. Admins change roles with `PATCH /api/users/{id}/ {"role": "admin"|"user"}` (not their own: `409`).
 - **Rule builder**: `GET /api/rules/catalog/` returns the fields and operators a rule may use (see [Rules](#rules)).
 
 ## API conventions
@@ -52,7 +57,11 @@ uv run python manage.py runserver   # http://127.0.0.1:8000/api/
 
 | Method | URL | Purpose |
 |---|---|---|
-| POST | `/api/auth/token/` | Operator login → token (the only endpoint without a token) |
+| POST | `/api/auth/register/` | Create a read-only account (no token needed) |
+| POST | `/api/auth/token/` | Log in → token (no token needed) |
+| POST | `/api/auth/logout/` | Delete the caller's token |
+| GET | `/api/users/` | List users (`search`), admin only |
+| GET, PATCH, DELETE | `/api/users/{id}/` | One user; `PATCH` changes `role`; admin only, not yourself |
 | GET, POST | `/api/apps/` | List (`search`) / register apps |
 | GET, PUT, PATCH, DELETE | `/api/apps/{id}/` | One app |
 | GET | `/api/apps/{id}/evaluate/` | May the app run now? (live inverter read) |
@@ -254,7 +263,8 @@ The diagram is rendered from [`docs/db-schema.mmd`](docs/db-schema.mmd):
 
 ## Repository layout
 
-- `config/`: Django settings (DRF token auth for every endpoint) and root URLs (`admin/`, `api/auth/token/` → DRF `obtain_auth_token`, `api/energy/` → inverter_app, `api/` → director_app).
+- `config/`: Django settings (DRF token auth + role permission for every endpoint) and root URLs (`admin/`, `api/` → accounts_app, `api/energy/` → inverter_app, `api/` → director_app).
+- `src/accounts_app/`: registration, login, logout, users and roles.
 - `src/director_app/`: apps, rules (engine in `rules.py`), policies, jobs, evaluation, admin rule builder.
 - `src/inverter_app/`: energy snapshots, `/api/energy/`, Solarman inverter client, curtailment / irradiance proof of concept.
 - `src/utils/`: shared helpers (logging, DB schema names, UTC serializer base).

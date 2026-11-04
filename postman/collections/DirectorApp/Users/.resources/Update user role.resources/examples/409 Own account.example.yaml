@@ -1,0 +1,17 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/users/1/'
+  method: PATCH
+response:
+  statusCode: 409
+  statusText: Conflict
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "You can't change your own role or delete yourself."
+      }
+order: 3000

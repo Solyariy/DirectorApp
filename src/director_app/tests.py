@@ -6,7 +6,6 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.utils import timezone
-from rest_framework.test import APIClient
 
 from src.director_app.models import (
     Job,
@@ -950,89 +949,6 @@ class RuleAdminTests(TestCase):
             f"/admin/director_app/policy/{policy.id}/change/"
         )
         self.assertContains(response, "solar_power_w ≥ 1500")
-
-
-NO_CREDENTIALS = "Authentication credentials were not provided."
-
-
-class AuthTests(TestCase):
-    def setUp(self):
-        User.objects.create_user(username="operator", password="secret")
-
-    def test_obtain_token(self):
-        response = APIClient().post(
-            "/api/auth/token/",
-            {"username": "operator", "password": "secret"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        token = response.json()["token"]
-        client = APIClient()
-        client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
-        self.assertEqual(client.get("/api/apps/").status_code, 200)
-
-    def test_obtain_token_is_stable(self):
-        body = {"username": "operator", "password": "secret"}
-        first = APIClient().post(
-            "/api/auth/token/",
-            body,
-            format="json",
-        )
-        second = APIClient().post(
-            "/api/auth/token/",
-            body,
-            format="json",
-        )
-        self.assertEqual(first.json()["token"], second.json()["token"])
-
-    def test_wrong_password(self):
-        response = APIClient().post(
-            "/api/auth/token/",
-            {"username": "operator", "password": "nope"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            response.json(),
-            {
-                "non_field_errors": [
-                    "Unable to log in with provided credentials.",
-                ],
-            },
-        )
-
-    def test_every_endpoint_requires_token(self):
-        paths = [
-            "/api/apps/",
-            "/api/apps/1/",
-            "/api/apps/1/evaluate/",
-            "/api/rules/",
-            "/api/rules/catalog/",
-            "/api/rules/1/",
-            "/api/policies/",
-            "/api/policies/1/",
-            "/api/policies/1/apps/",
-            "/api/jobs/",
-            "/api/jobs/1/",
-            "/api/energy/snapshots/",
-            "/api/energy/current/",
-        ]
-        for path in paths:
-            with self.subTest(path=path):
-                response = APIClient().get(path)
-                self.assertEqual(response.status_code, 401)
-                self.assertEqual(response["WWW-Authenticate"], "Token")
-                self.assertEqual(
-                    response.json(),
-                    {"detail": NO_CREDENTIALS},
-                )
-
-    def test_invalid_token(self):
-        client = APIClient()
-        client.credentials(HTTP_AUTHORIZATION="Token wrong")
-        response = client.post("/api/rules/1/unlink/")
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json(), {"detail": "Invalid token."})
 
 
 class RuleCatalogTests(OperatorTestCase):
