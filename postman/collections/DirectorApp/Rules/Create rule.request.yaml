@@ -1,0 +1,21 @@
+$kind: http-request
+description: 'Stores the new id in `ruleId`. `combination` grammar: README.md, "Rules".'
+method: POST
+url: '{{baseUrl}}/rules/'
+order: 2000
+body:
+  type: json
+  content: |-
+    {
+      "name": "Sunny",
+      "description": "Solar output above 1.5 kW",
+      "combination": {"ge": [{"field": "solar_power_w"}, 1500]}
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      const rule = pm.response.json();
+      pm.test('New rule is active', () => pm.expect(rule.is_active).to.eql(true));
+      pm.collectionVariables.set('ruleId', rule.id);

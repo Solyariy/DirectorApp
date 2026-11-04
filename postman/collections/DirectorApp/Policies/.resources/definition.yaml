@@ -1,0 +1,3 @@
+$kind: collection
+description: 'Policies (director_app, `/api/policies/`): combine linked rules with `and` / `or`. `rules`, when sent, replaces the policy''s rule links. Run `Create rule` first; `Create policy` links `ruleId` and stores the new id in `policyId`.'
+order: 2000
