@@ -33,6 +33,7 @@ add short description of acquired knowledge here in bulleted list:
 - CORS via `django-cors-headers`: origins from `CORS_ALLOWED_ORIGINS` in `.env` (comma-separated), only `/api/`
 - API datetimes are UTC (`...Z`): serializers subclass `src.utils.serializers.UTCModelSerializer`; offset-less input (bodies, snapshot `from`/`to`) = UTC; `TIME_ZONE` stays Europe/Kyiv for rule `weekday`/`local_time`
 - `GET /api/rules/catalog/` returns `rules.catalog()` (fields + operators) for the frontend rule builder
+- Exploratory analysis: Jupyter notebooks in `analysis/` (shared loaders in `analysis/common.py`, reuse `inverter_app.curtailment` to keep only unconstrained readings; 10-min UTC bins labelled by bin end to match Open-Meteo averages) over CSVs in `data/` (`inverter_app_energysnapshot.csv` export, `openmeteo.py` satellite irradiance, `openmeteo2.py` hourly archive weather interpolated via `common.interpolate_weather`); `matplotlib` is a dev dependency
 
 ## Scope discipline
 - Implement only the fields and enums I ask for. Propose extra fields (e.g. content_type) as suggestions, and don't add them to code.
