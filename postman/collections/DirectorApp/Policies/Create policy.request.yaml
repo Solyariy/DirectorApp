@@ -8,7 +8,7 @@ body:
   content: |-
     {
       "name": "Sunny weekdays",
-      "description": "Daytime surplus only",
+      "description": "Daytime solar only",
       "operator": "and",
       "is_active": true,
       "max_concurrent_jobs": 1,
@@ -25,3 +25,4 @@ scripts:
         pm.expect(String(policy.rules[0].rule.id)).to.eql(pm.collectionVariables.get('ruleId'));
       });
       pm.collectionVariables.set('policyId', policy.id);
+examples: './.resources/Create policy.resources/examples'

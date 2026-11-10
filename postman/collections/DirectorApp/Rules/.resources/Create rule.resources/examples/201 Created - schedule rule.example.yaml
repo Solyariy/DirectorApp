@@ -1,0 +1,56 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/rules/'
+  method: POST
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 2,
+        "name": "Weekday daytime",
+        "description": "Mon-Fri, 09:00-17:00",
+        "combination": {
+          "and": [
+            {
+              "in": [
+                {
+                  "field": "weekday"
+                },
+                [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ]
+              ]
+            },
+            {
+              "ge": [
+                {
+                  "field": "local_time"
+                },
+                "09:00"
+              ]
+            },
+            {
+              "lt": [
+                {
+                  "field": "local_time"
+                },
+                "17:00"
+              ]
+            }
+          ]
+        },
+        "is_active": true,
+        "created_at": "2026-11-04T10:00:00Z",
+        "updated_at": "2026-11-04T10:00:00Z"
+      }
+order: 2000

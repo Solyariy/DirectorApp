@@ -18,3 +18,4 @@ scripts:
     code: |-
       pm.test('Status is 200', () => pm.response.to.have.status(200));
       pm.test('Description updated', () => pm.expect(pm.response.json().description).to.eql('Hourly embeddings for the home wiki'));
+examples: './.resources/Update app.resources/examples'

@@ -1,0 +1,17 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/policies/1/'
+  method: DELETE
+response:
+  statusCode: 409
+  statusText: Conflict
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "The policy is assigned to apps; move them to another policy first."
+      }
+order: 2000

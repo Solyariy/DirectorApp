@@ -1,0 +1,17 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/auth/token/'
+  method: POST
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "token": "9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b"
+      }
+order: 1000

@@ -1,0 +1,3 @@
+$kind: collection
+description: 'Registration, login and logout (`/api/auth/`). Contract: `postman/specs/director-api.yaml`. `Register` creates a read-only user and stores its id in `userId`; `Obtain token` logs in as `username` / `password` and stores the key in `token`; `Logout` deletes that token (run it last, then `Obtain token` again).'
+order: 500

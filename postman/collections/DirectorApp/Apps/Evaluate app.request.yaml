@@ -1,0 +1,19 @@
+$kind: http-request
+description: 'Live inverter read (stored as a snapshot) and evaluation of the app''s policy. `can_run` is false and `policy` null without an active policy. 503 when the inverter is unreachable.'
+method: GET
+url: '{{baseUrl}}/apps/:app_id/evaluate/'
+order: 5000
+pathVariables:
+  - key: app_id
+    value: '{{appId}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const result = pm.response.json();
+      pm.test('Has a decision and the reading', () => {
+        pm.expect(result.can_run).to.be.a('boolean');
+        pm.expect(result.energy).to.have.property('solar_power_w');
+      });
+examples: './.resources/Evaluate app.resources/examples'

@@ -1,0 +1,19 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/jobs/?status=done'
+  method: GET
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "status": [
+          "Must be one of ['queued', 'in-process', 'success', 'failed']."
+        ]
+      }
+order: 2000

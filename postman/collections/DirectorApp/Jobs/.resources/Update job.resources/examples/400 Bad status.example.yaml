@@ -1,0 +1,19 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/jobs/1/'
+  method: PATCH
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "status": [
+          "\"done\" is not a valid choice."
+        ]
+      }
+order: 2000

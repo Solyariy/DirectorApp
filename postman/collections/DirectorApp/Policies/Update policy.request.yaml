@@ -22,3 +22,4 @@ scripts:
         pm.expect(link.is_active).to.eql(false);
         pm.expect(link.effective).to.eql(false);
       });
+examples: './.resources/Update policy.resources/examples'

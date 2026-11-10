@@ -1,4 +1,7 @@
+AGENTS.md
+CLAUDE.md
 tools/
+data
 .claude
 .idea
 # Created by https://www.toptal.com/developers/gitignore/api/python

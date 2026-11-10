@@ -1,0 +1,25 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/jobs/'
+  method: POST
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "app": [
+          "Invalid pk \"999\" - object does not exist."
+        ],
+        "data": [
+          "This list may not be empty."
+        ],
+        "status": [
+          "\"done\" is not a valid choice."
+        ]
+      }
+order: 3000
