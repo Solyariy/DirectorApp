@@ -15,24 +15,31 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.utils.logs import logging_config
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
+
+# structlog renders both the project Logger and Django's own records.
+LOGGING = logging_config(os.getenv("LOG_LEVEL", "INFO"))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = (
-    "django-insecure--)_p_y9^zn2@m5571o)od$%v8pk(cj_8hqe)_4jy7r&l!-99)j"
-)
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 
 # Application definition
@@ -42,6 +49,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
+    "drf_spectacular",
     "src.accounts_app",
     "src.inverter_app",
     "src.director_app",
@@ -55,6 +63,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "src.utils.middleware.log_id_middleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # Before CommonMiddleware, so redirects and errors carry CORS headers.
     "corsheaders.middleware.CorsMiddleware",
@@ -86,6 +95,19 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "src.utils.permissions.IsAdminOrReadOnly",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# OpenAPI schema at /api/schema/, Swagger UI at /api/docs/, ReDoc at
+# /api/redoc/ (config/urls.py).
+SPECTACULAR_SETTINGS = {
+    "TITLE": "LLM Task Director API",
+    "DESCRIPTION": (
+        "Decides when LLM work may run on solar power. Send "
+        "`Authorization: Token <key>` from POST /api/auth/token/."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 TEMPLATES = [

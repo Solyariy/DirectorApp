@@ -9,9 +9,13 @@ image as /app/worker_settings.py).
 
 import os
 
+from src.utils.logs import logging_config
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "inverter-worker-no-http")
 
 DEBUG = False
+
+LOGGING = logging_config(os.getenv("LOG_LEVEL", "INFO"))
 
 INSTALLED_APPS = [
     "src.inverter_app",

@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from drf_spectacular.utils import extend_schema
 from rest_framework import pagination, status, views
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import NotFound
@@ -6,6 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from src.accounts_app.serializers import RegisterSerializer, UserSerializer
+from src.utils.logs import Logger
 from src.utils.permissions import IsAdmin
 
 
@@ -19,11 +21,17 @@ class RegisterView(views.APIView):
     # Open sign-up; a stale token header must not block it.
     authentication_classes = []
     permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        Logger.info(
+            "User registered",
+            user_id=user.pk,
+            username=user.username,
+        )
         return Response(
             UserSerializer(user).data,
             status=status.HTTP_201_CREATED,
@@ -33,14 +41,17 @@ class RegisterView(views.APIView):
 class LogoutView(views.APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=None, responses={204: None})
     def post(self, request):
         # The token is shared by all of the user's sessions; all end.
         Token.objects.filter(user=request.user).delete()
+        Logger.info("User logged out", user_id=request.user.pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserListView(views.APIView):
     permission_classes = [IsAdmin]
+    serializer_class = UserSerializer
 
     def get(self, request):
         queryset = User.objects.order_by("id")
@@ -59,6 +70,7 @@ class UserListView(views.APIView):
 
 class UserDetailView(views.APIView):
     permission_classes = [IsAdmin]
+    serializer_class = UserSerializer
 
     def get(self, request, user_id):
         return Response(UserSerializer(self._get(user_id)).data)
@@ -66,6 +78,7 @@ class UserDetailView(views.APIView):
     def patch(self, request, user_id):
         user = self._get(user_id)
         if user.pk == request.user.pk:
+            Logger.warning("Admin tried to change own role", user_id=user_id)
             return self._self_conflict()
         serializer = UserSerializer(
             user,
@@ -74,13 +87,25 @@ class UserDetailView(views.APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        Logger.info(
+            "User updated",
+            user_id=user_id,
+            by=request.user.pk,
+            fields=list(request.data),
+        )
         return Response(serializer.data)
 
     def delete(self, request, user_id):
         user = self._get(user_id)
         if user.pk == request.user.pk:
+            Logger.warning("Admin tried to delete self", user_id=user_id)
             return self._self_conflict()
         user.delete()
+        Logger.info(
+            "User deleted",
+            user_id=user_id,
+            by=request.user.pk,
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @staticmethod
