@@ -15,17 +15,70 @@ What it manages:
 Requirements: Python 3.11+, [`uv`](https://docs.astral.sh/uv/), Docker.
 
 ```sh
-cp .env.example .env            # fill in POSTGRES_PASSWORD, INVERTER_LOGGER_*, CORS_ALLOWED_ORIGINS
-uv sync
+cp .env.example .env            # fill in DJANGO_SECRET_KEY, POSTGRES_PASSWORD, INVERTER_LOGGER_* (see Environment variables)
+uv sync                         # dependencies from pyproject.toml / uv.lock, incl. the dev group (pytest)
 docker compose up -d db         # shared Postgres 17
 uv run python manage.py migrate
 uv run python manage.py runserver   # http://127.0.0.1:8000/api/
 ```
 
 - Admin (rule builder, policies): `http://127.0.0.1:8000/admin/` (create a user with `uv run python manage.py createsuperuser`).
-- Tests (need the `db` container): `uv run python manage.py test src.director_app src.inverter_app`.
+- API docs: Swagger UI `http://127.0.0.1:8000/api/docs/`, ReDoc `http://127.0.0.1:8000/api/redoc/` (see [API documentation](#api-documentation)).
 - Lint / format: `pyfmt --check src config`.
 - Find the inverter logger's IP and serial: `src/inverter_app/inverter_service/detector.py` (needs `DEVICE_LAN_IP`, `BROADCAST`). Django won't start without `INVERTER_LOGGER_SERIAL` set in `.env`.
+
+## Environment variables
+
+Settings are read from `.env` (loaded by `python-dotenv` in `config/settings.py`; `.env` is git-ignored). `.env.example` lists every key with placeholder values.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | yes | Django secret key. Generate one: `uv run python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"` |
+| `DJANGO_DEBUG` | no (`false`) | `true` for local development |
+| `DJANGO_ALLOWED_HOSTS` | no | Comma-separated hosts, e.g. `localhost,127.0.0.1` |
+| `LOG_LEVEL` | no (`INFO`) | `DEBUG`, `INFO`, `WARNING` or `ERROR` |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | yes | Database credentials (also used by the `db` container) |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | no (`localhost`, `5444` in the example) | Where Django reaches Postgres |
+| `INVERTER_LOGGER_IP`, `INVERTER_LOGGER_SERIAL` | yes (serial) | Solarman logger of the inverter; Django won't start without the serial |
+| `INVERTER_MANAGER_CONNECTION_TTL_MINUTES` | no | How long an inverter connection is reused |
+| `INVERTER_WORKER_CRON_CYCLE_MINUTES` | no (`5`) | Snapshot collection interval of the `inverter-worker` container |
+| `DEVICE_LAN_IP`, `BROADCAST` | only for `detector.py` | Finding the inverter logger on the LAN |
+| `PV_SITE_*` | only for `compare_pv_estimate` | PV array location and size |
+| `CORS_ALLOWED_ORIGINS` | no | Comma-separated frontend origins allowed to call `/api/` |
+
+## Tests
+
+Tests use pytest + pytest-django (installed by `uv sync`) and need the database container:
+
+```sh
+docker compose up -d db
+uv run pytest                                          # all tests
+uv run pytest src/director_app/test_rules_api.py       # one file
+uv run pytest --cov --cov-report=term-missing          # with coverage (pytest-cov)
+```
+
+- `conftest.py` holds the shared fixtures (`anon_api`, `admin_api`, `user_api`, `rule`, `linked_rule`).
+- `src/director_app/test_rules_api.py` covers the Rules resource: auth (`401`), roles (`user` reads, can't write: `403`), missing ids (`404`), invalid data (`400`), the linked-rule delete conflict (`409`) and the API docs pages. The other `tests.py` files are Django `TestCase` classes, which pytest runs as well.
+
+## API documentation
+
+The OpenAPI 3 schema is generated from the code by [drf-spectacular](https://drf-spectacular.readthedocs.io/):
+
+- Swagger UI: `http://127.0.0.1:8000/api/docs/`. Click **Authorize** and enter `Token <key>` from `POST /api/auth/token/`.
+- ReDoc: `http://127.0.0.1:8000/api/redoc/`
+- Raw schema: `GET /api/schema/` (YAML; `?format=json` for JSON), or as a file: `uv run python manage.py spectacular --file schema.yaml`
+
+The Rules resource is documented in full: parameters, request/response bodies, status codes and examples. The hand-written [`postman/specs/director-api.yaml`](postman/specs/director-api.yaml) is still the contract for the frontend.
+
+## Logging
+
+The project `Logger` (`src/utils/logs.py`, structlog) is wired into Django's `LOGGING`, so Django's own records (`django.request` logs every 4xx as WARNING and 5xx as ERROR) and the app's records go to stdout in one format. Every request gets its own `log_id`. The level comes from `LOG_LEVEL`. Logged:
+
+- INFO: register / logout / user changes, create / update / delete of apps, rules, policies and jobs, rule unlink, evaluation results
+- WARNING: blocked actions (`409`: linked rule, assigned policy, admin changing themselves)
+- ERROR: inverter unreachable (`503`)
+
+Only ids, names and changed field names are logged, never passwords, tokens or request bodies.
 
 ## Building a frontend
 

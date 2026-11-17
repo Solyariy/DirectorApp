@@ -1,5 +1,4 @@
 import functools
-import logging
 import os
 import sys
 import traceback
@@ -8,34 +7,63 @@ import structlog
 
 from src.utils.order import get_log_id
 
-handler = logging.StreamHandler(sys.stdout)
+# NO_COLOR (no-color.org) drops ANSI codes, e.g. in containers
+RENDERER = structlog.dev.ConsoleRenderer(
+    sort_keys=False,
+    colors="NO_COLOR" not in os.environ,
+)
+TIMESTAMPER = structlog.processors.TimeStamper(fmt="%H:%M:%S")
 
 # --- Configure structlog ---
+# Events go through stdlib logging, so Django's LOGGING (logging_config)
+# decides levels and output for them and for Django's own records alike.
 structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="%H:%M:%S"),
-        # structlog.stdlib.PositionalArgumentsFormatter(),
-        # structlog.processors.StackInfoRenderer(),
-        # structlog.processors.format_exc_info,
-        # NO_COLOR (no-color.org) drops ANSI codes, e.g. in containers
-        structlog.dev.ConsoleRenderer(
-            sort_keys=False,
-            colors="NO_COLOR" not in os.environ,
-        ),
+        TIMESTAMPER,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
     ],
-    wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
+    wrapper_class=structlog.stdlib.BoundLogger,
     context_class=dict,
-    logger_factory=structlog.PrintLoggerFactory(),
+    logger_factory=structlog.stdlib.LoggerFactory(),
     cache_logger_on_first_use=True,
 )
 
 main_logger = structlog.get_logger("MainLogger")
 
-logging.getLogger("uvicorn").setLevel(logging.WARNING)
-logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+def logging_config(level: str) -> dict:
+    """Django LOGGING: every record rendered by structlog to stdout."""
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "structlog": {
+                "()": structlog.stdlib.ProcessorFormatter,
+                "processor": RENDERER,
+                # Django's own (non-structlog) records get the same fields.
+                "foreign_pre_chain": [
+                    structlog.processors.add_log_level,
+                    TIMESTAMPER,
+                ],
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "stream": sys.stdout,
+                "formatter": "structlog",
+            },
+        },
+        "root": {"handlers": ["console"], "level": level.upper()},
+        "loggers": {
+            # Django adds its own handlers here; keep one console output.
+            "django": {"handlers": [], "propagate": True},
+            # SQL queries only when explicitly asked for.
+            "django.db.backends": {"level": "WARNING"},
+        },
+    }
 
 
 def inject_traceback(func):
