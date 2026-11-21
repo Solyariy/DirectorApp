@@ -1,5 +1,6 @@
 .cache.sqlite
 /data
+/openmeteo/data
 tools/
 .claude
 .idea

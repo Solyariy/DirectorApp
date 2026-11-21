@@ -43,4 +43,4 @@
 
 - `accounts_app/AGENTS.md` — register / token login / logout, `/api/users/` role management, role rules (`admin` = staff, `user` = read-only)
 - `director_app/AGENTS.md` — `Rule` expressions, CRUD + admin rule builder, `Policy` (`and`/`or` over rules), `PolicyRuleRelation`, `RegisteredApp` (one policy), `Job` CRUD, policy evaluation, planned `JobConsumption`
-- `inverter_app/AGENTS.md` — `EnergySnapshot` ledger model, `/api/energy/` endpoints, `inverter_service/` Solarman V5 client, curtailment classification, irradiance proof of concept, snapshot collector command
+- `inverter_app/AGENTS.md` — `EnergySnapshot` ledger model, `/api/energy/` endpoints, `inverter_service/` Solarman V5 client, curtailment classification, snapshot collector command

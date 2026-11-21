@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
+ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT / "openmeteo" / "data"
 sys.path.insert(0, str(ROOT))
 
 from src.inverter_app.curtailment import (  # noqa: E402
@@ -20,7 +20,7 @@ from src.inverter_app.curtailment import (  # noqa: E402
 )
 from src.inverter_app.schemas import EnergySnapshotSchema  # noqa: E402
 
-SNAPSHOTS_CSV = DATA_DIR / "inverter_app_energysnapshot.csv"
+SNAPSHOTS_CSV = ROOT / "data" / "inverter_app_energysnapshot.csv"
 SNAPSHOT_COLUMNS = [
     "timestamp",
     "id",

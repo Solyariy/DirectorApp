@@ -77,7 +77,7 @@ Default section order:
 ## Project
 
 - LLM Task Director: Django + DRF service that decides whether registered home-server LLM apps may run, from policies over live solar inverter readings; `postman/specs/director-api.yaml` is the API contract (README.md is its human overview)
-- Stack: Python 3.11+, Django 5.2, DRF, django-filter, django-cors-headers, pydantic, structlog, pysolarmanv5, pvlib (+pandas), requests; deps managed by `uv` (`pyproject.toml`, `uv.lock`)
+- Stack: Python 3.11+, Django 5.2, DRF, django-filter, django-cors-headers, pydantic, structlog, pysolarmanv5; deps managed by `uv` (`pyproject.toml`, `uv.lock`)
 - DB: shared Postgres 17 from `compose.yaml` (`db` service; start with `docker compose up -d db`, needed for tests too), connection from `POSTGRES_*` in `.env`; project tables in schema `apps`, Django's own in `public`; `db.sqlite3` is the legacy pre-Postgres DB, kept untouched (never delete); settings module `config.settings`
 - Secrets/env: `.env` (untracked) loaded via `python-dotenv`; keys listed in `.env.example`
 - Auth: DRF token auth for every `/api/` endpoint (`Authorization: Token <key>`, Django users) except `auth/register/` and `auth/token/`; roles `admin` (`is_staff`, full access) and `user` (read-only, safe methods) via the global `src.utils.permissions.IsAdminOrReadOnly`; admin-only GETs set `IsAdmin`; owned by `src/accounts_app/`; RegisteredApps have no credentials of their own
@@ -112,7 +112,7 @@ When the user requests a durable behavior change, record it here or in the relev
 - `src/AGENTS.md` — application code: Django apps, shared utils, logging, app boundaries
   - `src/accounts_app/AGENTS.md` — registration, login/logout (DRF tokens), users + roles (`admin` = staff, `user` = read-only)
   - `src/director_app/AGENTS.md` — registered apps (one policy each), rules CRUD + admin rule builder, policies (writable rule links), jobs CRUD, policy evaluation
-  - `src/inverter_app/AGENTS.md` — energy snapshot ledger, `/api/energy/` API, the Solarman inverter client, curtailment/irradiance proof of concept
+  - `src/inverter_app/AGENTS.md` — energy snapshot ledger, `/api/energy/` API, the Solarman inverter client, curtailment
 - Owned by root (no child doc):
   - `config/` — Django project package: settings (`REST_FRAMEWORK`: `TokenAuthentication` + `IsAdminOrReadOnly` for every API view), root URLconf (`admin/`, `api/` → `src.accounts_app.urls`, `api/energy/` → `src.inverter_app.urls`, `api/` → `src.director_app.urls`), ASGI/WSGI
   - `docs/` — `db-schema.mmd` (Mermaid ER source of truth) and rendered `db-schema.png`
