@@ -14,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from src.inverter_app.schemas import PvSiteSchema
+from openmeteo.schemas import PvSiteSchema
 
 load_dotenv()
 

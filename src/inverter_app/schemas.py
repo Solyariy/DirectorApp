@@ -24,14 +24,3 @@ class EnergySnapshotSchema(BaseModel):
     pv2_current_a: float | None = None
     pv2_power_w: int | None = None
     battery_max_charge_current_a: int | None = None
-
-
-class PvSiteSchema(BaseModel):
-    latitude: float
-    longitude: float
-    tilt_deg: float
-    # Compass convention (pvlib): 180 = south, 90 = east, 270 = west.
-    azimuth_deg: float
-    peak_power_w: float
-    # Losses between plane-of-array irradiance and inverter DC output.
-    performance_ratio: float = 0.8

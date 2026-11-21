@@ -298,8 +298,6 @@ docker compose up -d db inverter-worker
 docker compose logs -f inverter-worker
 ```
 
-**PV estimate (proof of concept).** `uv run python manage.py compare_pv_estimate --date YYYY-MM-DD [--csv out.csv]` compares one day of snapshots with satellite irradiance (Open-Meteo) and the clear-sky ceiling (pvlib). It uses the per-string PV data to tell curtailed readings from unconstrained ones, and needs the `PV_SITE_*` keys from `.env.example`.
-
 ## Database schema
 
 Postgres runs in Docker (`compose.yaml`, connection settings `POSTGRES_*` in `.env`). Project tables live in the `apps` schema and Django's built-in tables in `public`. `db.sqlite3` is the legacy pre-Postgres database, kept for reference.
@@ -319,7 +317,7 @@ The diagram is rendered from [`docs/db-schema.mmd`](docs/db-schema.mmd):
 - `config/`: Django settings (DRF token auth + role permission for every endpoint) and root URLs (`admin/`, `api/` → accounts_app, `api/energy/` → inverter_app, `api/` → director_app).
 - `src/accounts_app/`: registration, login, logout, users and roles.
 - `src/director_app/`: apps, rules (engine in `rules.py`), policies, jobs, evaluation, admin rule builder.
-- `src/inverter_app/`: energy snapshots, `/api/energy/`, Solarman inverter client, curtailment / irradiance proof of concept.
+- `src/inverter_app/`: energy snapshots, `/api/energy/`, Solarman inverter client, curtailment.
 - `src/utils/`: shared helpers (logging, DB schema names, UTC serializer base).
 - `postman/`: OpenAPI spec (`specs/director-api.yaml`) and the Postman collection (`collections/DirectorApp`).
 - `deploy/inverter_worker/`: the snapshot collector image.
