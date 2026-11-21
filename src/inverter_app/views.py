@@ -19,6 +19,8 @@ class SnapshotPagination(pagination.PageNumberPagination):
 
 
 class EnergySnapshotListView(views.APIView):
+    serializer_class = EnergySnapshotSerializer
+
     def get(self, request):
         queryset = self._filter_by_time_range(
             EnergySnapshot.objects.order_by("-timestamp"),
@@ -61,6 +63,7 @@ class EnergySnapshotListView(views.APIView):
 class EnergyCurrentView(views.APIView):
     # A GET, but it reads the inverter live and stores a snapshot.
     permission_classes = [IsAdmin]
+    serializer_class = EnergySnapshotSerializer
 
     def get(self, request):
         try:
