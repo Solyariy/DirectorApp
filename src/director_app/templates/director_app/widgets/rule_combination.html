@@ -1,0 +1,9 @@
+<div class="rule-builder" data-input="{{ widget.attrs.id }}" data-catalog="{{ widget.catalog_id }}">
+  <div class="rule-builder__tree"></div>
+  <p class="rule-builder__preview"></p>
+  <details class="rule-builder__raw">
+    <summary>JSON</summary>
+    {% include "django/forms/widgets/textarea.html" %}
+  </details>
+  {{ widget.catalog|json_script:widget.catalog_id }}
+</div>

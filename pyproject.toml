@@ -1,0 +1,50 @@
+[project]
+name = "book-store-rest-ha"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "solyariy", email = "solalex005@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "cachetools>=7.2.2",
+    "django>=5.2.18",
+    "django-filter>=26.2",
+    "djangorestframework>=3.18.3",
+    "djangorestframework-stubs>=3.18.1",
+    "dotenv>=0.9.9",
+    "markdown>=3.11.1",
+    "psycopg[binary]>=3.3.6",
+    "pvlib>=0.16.1",
+    "pydantic>=2.14.1",
+    "pysolarmanv5>=3.0.6",
+    "requests>=2.34.2",
+    "structlog>=26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.0",
+]
+
+
+[tool.ruff]
+line-length = 79
+target-version = "py311"
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+# E/W: pycodestyle (PEP 8), F: pyflakes, I: isort, N: PEP 8 naming, Q: quotes
+select = ["E", "W", "F", "I", "N", "Q"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+multiline-quotes = "double"
+docstring-quotes = "double"
+
+[tool.ruff.format]
+quote-style = "double"
+# A trailing comma keeps arguments one per line; ~/.local/bin/pyfmt adds it
+# wherever a declaration or call has more than two parameters.
+skip-magic-trailing-comma = false

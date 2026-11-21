@@ -1,0 +1,10 @@
+$kind: http-request
+description: 'Live read from the inverter over LAN, persisted as a snapshot; adds surplus_w and has_surplus. 503 when the inverter is unreachable.'
+method: GET
+url: '{{baseUrl}}/energy/current/'
+order: 3000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));

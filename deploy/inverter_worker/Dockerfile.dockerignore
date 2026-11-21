@@ -1,0 +1,13 @@
+.git
+.venv
+.env
+.idea
+.claude
+.postman
+.ruff_cache
+**/__pycache__
+db.sqlite3
+collector.log
+docs
+postman
+tools

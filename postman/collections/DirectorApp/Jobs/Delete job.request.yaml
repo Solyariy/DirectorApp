@@ -1,0 +1,12 @@
+$kind: http-request
+method: DELETE
+url: '{{baseUrl}}/jobs/:job_id/'
+order: 5000
+pathVariables:
+  - key: job_id
+    value: '{{jobId}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 204', () => pm.response.to.have.status(204));

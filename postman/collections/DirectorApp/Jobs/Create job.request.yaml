@@ -1,0 +1,20 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/jobs/'
+order: 2000
+body:
+  type: json
+  content: |-
+    {
+      "model": "llama3.1:8b",
+      "data": ["https://example.com/docs/report.pdf"],
+      "prompt": "Summarize the document in five bullet points."
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      const job = pm.response.json();
+      pm.test('New job is queued', () => pm.expect(job.status).to.eql('queued'));
+      pm.collectionVariables.set('jobId', job.id);

@@ -1,0 +1,20 @@
+$kind: http-request
+description: 'PATCH takes any subset of `name`, `description`, `policy` (`null` removes the policy); PUT needs `name`.'
+method: PATCH
+url: '{{baseUrl}}/apps/:app_id/'
+order: 4000
+pathVariables:
+  - key: app_id
+    value: '{{appId}}'
+body:
+  type: json
+  content: |-
+    {
+      "description": "Hourly embeddings for the home wiki"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      pm.test('Description updated', () => pm.expect(pm.response.json().description).to.eql('Hourly embeddings for the home wiki'));

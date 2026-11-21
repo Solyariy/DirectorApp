@@ -1,0 +1,3 @@
+$kind: collection
+description: 'Rules (director_app, `/api/rules/`). Contract: `postman/specs/rules.yaml`. Run `Create rule` first; it stores the new id in `ruleId`. `Delete rule` returns 409 while policies use the rule; run `Unlink rule` first.'
+order: 1500

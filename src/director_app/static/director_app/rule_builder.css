@@ -1,0 +1,119 @@
+/* Rule builder; colours come from the admin's theme variables. */
+.rule-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 1000px;
+  flex: 1;
+}
+
+.rule-builder .rb-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rule-builder .rb-node > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-builder .rb-node--negated > :first-child {
+  border-left: 3px solid var(--error-fg, #ba2121);
+  padding-left: 6px;
+}
+
+.rule-builder .rb-group {
+  border: 1px solid var(--border-color, #ccc);
+  border-left: 3px solid var(--primary, #79aec8);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--darkened-bg, #f8f8f8);
+}
+
+.rule-builder .rb-group__header,
+.rule-builder .rb-group__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-builder .rb-group__children {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 8px 12px;
+}
+
+.rule-builder .rb-condition,
+.rule-builder .rb-value,
+.rule-builder .rb-calc {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.rule-builder .rb-condition {
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  background: var(--body-bg, #fff);
+}
+
+.rule-builder .rb-calc {
+  padding: 2px 4px;
+  border: 1px dashed var(--border-color, #ccc);
+  border-radius: 4px;
+}
+
+.rule-builder .rb-input--list {
+  min-width: 14em;
+}
+
+.rule-builder .rb-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding-top: 4px;
+}
+
+.rule-builder .rb-button {
+  cursor: pointer;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  background: var(--body-bg, #fff);
+  color: var(--body-fg, #333);
+}
+
+.rule-builder .rb-button--remove {
+  padding: 2px 8px;
+  color: var(--error-fg, #ba2121);
+}
+
+.rule-builder .rb-hint {
+  color: var(--body-quiet-color, #666);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.rule-builder .rb-unknown code {
+  white-space: pre-wrap;
+}
+
+.rule-builder__preview {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--darkened-bg, #f8f8f8);
+  font-family: var(--font-family-monospace, monospace);
+}
+
+.rule-builder__raw textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-family-monospace, monospace);
+}

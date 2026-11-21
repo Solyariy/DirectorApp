@@ -1,0 +1,27 @@
+$kind: http-request
+description: 'Links the rule from `ruleId` and stores the new id in `policyId`. `rules` is optional.'
+method: POST
+url: '{{baseUrl}}/policies/'
+order: 2000
+body:
+  type: json
+  content: |-
+    {
+      "name": "Sunny weekdays",
+      "description": "Daytime surplus only",
+      "operator": "and",
+      "is_active": true,
+      "max_concurrent_jobs": 1,
+      "rules": [{"rule": {{ruleId}}, "is_active": true}]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      const policy = pm.response.json();
+      pm.test('Rule is linked', () => {
+        pm.expect(policy.rules).to.have.lengthOf(1);
+        pm.expect(String(policy.rules[0].rule.id)).to.eql(pm.collectionVariables.get('ruleId'));
+      });
+      pm.collectionVariables.set('policyId', policy.id);

@@ -1,0 +1,21 @@
+$kind: http-request
+description: 'Stores the new id in `appId`. `policy` is optional (null until assigned).'
+method: POST
+url: '{{baseUrl}}/apps/'
+order: 2000
+body:
+  type: json
+  content: |-
+    {
+      "name": "doc-indexer",
+      "description": "Nightly embeddings for the home wiki",
+      "policy": null
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      const app = pm.response.json();
+      pm.test('App is created without a policy', () => pm.expect(app.policy).to.eql(null));
+      pm.collectionVariables.set('appId', app.id);

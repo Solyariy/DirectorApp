@@ -1,0 +1,81 @@
+erDiagram
+    POLICY |o--o{ REGISTERED_APP : governs
+    POLICY ||--o{ POLICY_RULE_RELATION : combines
+    RULE ||--o{ POLICY_RULE_RELATION : "used by"
+    REGISTERED_APP |o--o{ JOB : submits
+
+    ENERGY_SNAPSHOT {
+        int id PK
+        datetime ts
+        int solar_w
+        int load_w
+        int battery_pct
+        int grid_w
+        float pv1_voltage_v "nullable, per PV string 1..2"
+        float pv1_current_a
+        int pv1_power_w
+        int battery_max_charge_current_a
+        string source
+    }
+
+    REGISTERED_APP {
+        int id PK
+        string name UK
+        string description
+        int policy_id FK "nullable, one policy per app"
+        datetime created_at
+    }
+
+    JOB {
+        int id PK
+        int app_id FK "nullable, set null on app delete"
+        string model "LLM model name"
+        string_array data "public http(s) URLs"
+        string prompt
+        string status "queued|in-process|success|failed"
+        datetime created_at
+        datetime updated_at
+    }
+
+    POLICY {
+        int id PK
+        string name UK
+        string description
+        bool is_active "policy switch"
+        string operator "and|or over its rules"
+        int max_concurrent_jobs
+        datetime created_at
+        datetime updated_at
+    }
+
+    POLICY_RULE_RELATION {
+        int id PK
+        int policy_id FK "unique with rule_id"
+        int rule_id FK
+        bool is_active "link switch"
+        datetime created_at
+    }
+
+    RULE {
+        int id PK
+        string name UK
+        string description
+        json combination "expression over the energy reading"
+        bool is_active "rule switch"
+        datetime created_at
+        datetime updated_at
+    }
+
+    classDef energy fill:#ecfeff,stroke:#22d3ee
+    classDef policy fill:#f0fdf4,stroke:#4ade80
+    classDef app fill:#f5f3ff,stroke:#a78bfa
+    classDef edge fill:#fefce8,stroke:#facc15
+    classDef rule fill:#fef2f2,stroke:#f87171
+    classDef job fill:#fff7ed,stroke:#fb923c
+
+    class ENERGY_SNAPSHOT energy
+    class POLICY policy
+    class REGISTERED_APP app
+    class POLICY_RULE_RELATION edge
+    class RULE rule
+    class JOB job
