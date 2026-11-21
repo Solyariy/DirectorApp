@@ -1,0 +1,23 @@
+$kind: http-request
+description: 'Exchanges a Django user''s `username` / `password` for its API token and stores it in `token`. Sends no token itself (no auth).'
+method: POST
+url: '{{baseUrl}}/auth/token/'
+order: 1000
+auth:
+  type: noauth
+body:
+  type: json
+  content: |-
+    {
+      "username": "{{username}}",
+      "password": "{{password}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Token is returned', () => pm.expect(body.token).to.be.a('string'));
+      pm.collectionVariables.set('token', body.token);
+examples: './.resources/Obtain token.resources/examples'

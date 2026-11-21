@@ -1,0 +1,11 @@
+$kind: http-request
+description: 'Paginated, ordered by id; `search` matches `username`.'
+method: GET
+url: '{{baseUrl}}/users/'
+order: 1000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+examples: './.resources/List users.resources/examples'

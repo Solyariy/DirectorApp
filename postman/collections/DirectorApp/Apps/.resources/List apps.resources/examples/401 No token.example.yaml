@@ -1,0 +1,19 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/apps/'
+  method: GET
+response:
+  statusCode: 401
+  statusText: Unauthorized
+  headers:
+    - key: Content-Type
+      value: application/json
+    - key: WWW-Authenticate
+      value: Token
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Authentication credentials were not provided."
+      }
+order: 9000

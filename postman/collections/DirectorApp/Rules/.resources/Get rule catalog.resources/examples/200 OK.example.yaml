@@ -1,0 +1,247 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/rules/catalog/'
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "fields": [
+          {
+            "name": "timestamp",
+            "type": "datetime",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "solar_power_w",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "load_power_w",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "grid_power_w",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "battery_power_w",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "battery_charge_pct",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "battery_voltage_v",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "grid_voltage_v",
+            "type": "number",
+            "nullable": false,
+            "description": null
+          },
+          {
+            "name": "pv1_voltage_v",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "pv1_current_a",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "pv1_power_w",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "pv2_voltage_v",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "pv2_current_a",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "pv2_power_w",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "battery_max_charge_current_a",
+            "type": "number",
+            "nullable": true,
+            "description": null
+          },
+          {
+            "name": "weekday",
+            "type": "number",
+            "nullable": false,
+            "description": "0 = Monday ... 6 = Sunday, local time"
+          },
+          {
+            "name": "local_time",
+            "type": "time",
+            "nullable": false,
+            "description": "Time of day of the reading, local time"
+          }
+        ],
+        "operators": [
+          {
+            "op": "and",
+            "kind": "logic",
+            "symbol": "AND",
+            "types": [
+              "bool"
+            ]
+          },
+          {
+            "op": "or",
+            "kind": "logic",
+            "symbol": "OR",
+            "types": [
+              "bool"
+            ]
+          },
+          {
+            "op": "not",
+            "kind": "logic",
+            "symbol": "NOT",
+            "types": [
+              "bool"
+            ]
+          },
+          {
+            "op": "eq",
+            "kind": "comparison",
+            "symbol": "=",
+            "types": [
+              "number",
+              "time",
+              "datetime"
+            ]
+          },
+          {
+            "op": "ne",
+            "kind": "comparison",
+            "symbol": "!=",
+            "types": [
+              "number",
+              "time",
+              "datetime"
+            ]
+          },
+          {
+            "op": "gt",
+            "kind": "comparison",
+            "symbol": ">",
+            "types": [
+              "number",
+              "time",
+              "datetime"
+            ]
+          },
+          {
+            "op": "ge",
+            "kind": "comparison",
+            "symbol": "≥",
+            "types": [
+              "number",
+              "time",
+              "datetime"
+            ]
+          },
+          {
+            "op": "lt",
+            "kind": "comparison",
+            "symbol": "<",
+            "types": [
+              "number",
+              "time",
+              "datetime"
+            ]
+          },
+          {
+            "op": "le",
+            "kind": "comparison",
+            "symbol": "≤",
+            "types": [
+              "number",
+              "time",
+              "datetime"
+            ]
+          },
+          {
+            "op": "in",
+            "kind": "membership",
+            "symbol": "in",
+            "types": [
+              "number",
+              "time"
+            ]
+          },
+          {
+            "op": "add",
+            "kind": "arithmetic",
+            "symbol": "+",
+            "types": [
+              "number"
+            ]
+          },
+          {
+            "op": "sub",
+            "kind": "arithmetic",
+            "symbol": "−",
+            "types": [
+              "number"
+            ]
+          },
+          {
+            "op": "mul",
+            "kind": "arithmetic",
+            "symbol": "×",
+            "types": [
+              "number"
+            ]
+          },
+          {
+            "op": "div",
+            "kind": "arithmetic",
+            "symbol": "÷",
+            "types": [
+              "number"
+            ]
+          }
+        ]
+      }
+order: 1000

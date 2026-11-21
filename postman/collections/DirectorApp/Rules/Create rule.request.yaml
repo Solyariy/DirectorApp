@@ -19,3 +19,4 @@ scripts:
       const rule = pm.response.json();
       pm.test('New rule is active', () => pm.expect(rule.is_active).to.eql(true));
       pm.collectionVariables.set('ruleId', rule.id);
+examples: './.resources/Create rule.resources/examples'

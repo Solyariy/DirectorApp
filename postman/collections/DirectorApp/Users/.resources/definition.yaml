@@ -1,0 +1,3 @@
+$kind: collection
+description: 'Accounts and roles (`/api/users/`), admin only (role `user` gets `403`). Contract: `postman/specs/director-api.yaml`. Run `Auth/Register` first; it stores the new id in `userId`.'
+order: 4500

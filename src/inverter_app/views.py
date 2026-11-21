@@ -1,3 +1,6 @@
+from datetime import UTC
+
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import pagination, status, views
 from rest_framework.exceptions import ValidationError
@@ -6,6 +9,7 @@ from rest_framework.response import Response
 from src.inverter_app.models import EnergySnapshot
 from src.inverter_app.scripts import read_latest_energy_and_save
 from src.inverter_app.serializers import EnergySnapshotSerializer
+from src.utils.permissions import IsAdmin
 
 
 class SnapshotPagination(pagination.PageNumberPagination):
@@ -47,11 +51,17 @@ class EnergySnapshotListView(views.APIView):
                 raise ValidationError(
                     {param: ["Enter a valid ISO 8601 datetime."]}
                 )
+            # Like request bodies: no offset means UTC.
+            if timezone.is_naive(value):
+                value = timezone.make_aware(value, UTC)
             queryset = queryset.filter(**{lookup: value})
         return queryset
 
 
 class EnergyCurrentView(views.APIView):
+    # A GET, but it reads the inverter live and stores a snapshot.
+    permission_classes = [IsAdmin]
+
     def get(self, request):
         try:
             snapshot = read_latest_energy_and_save()

@@ -1,9 +1,8 @@
-from rest_framework import serializers
-
 from src.inverter_app.models import EnergySnapshot
+from src.utils.serializers import UTCModelSerializer
 
 
-class EnergySnapshotSerializer(serializers.ModelSerializer):
+class EnergySnapshotSerializer(UTCModelSerializer):
     class Meta:
         model = EnergySnapshot
         fields = "__all__"

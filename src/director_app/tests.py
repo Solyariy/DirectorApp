@@ -4,9 +4,8 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
-from rest_framework.test import APIClient
 
 from src.director_app.models import (
     Job,
@@ -16,6 +15,7 @@ from src.director_app.models import (
     Rule,
 )
 from src.director_app.rules import (
+    catalog,
     describe,
     evaluate,
     rule_fields,
@@ -24,6 +24,7 @@ from src.director_app.rules import (
 from src.director_app.schemas import RuleContext
 from src.inverter_app.models import EnergySnapshot
 from src.inverter_app.schemas import EnergySnapshotSchema
+from src.utils.testing import operator_client
 
 # Wednesday 2026-10-14 23:30 in Kyiv (UTC+3), the project TIME_ZONE.
 ENERGY = EnergySnapshotSchema(
@@ -75,7 +76,7 @@ def attach(policy_id, rule, is_active=True) -> PolicyRuleRelation:
 
 class OperatorTestCase(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = operator_client()
 
     def create_app(self, name="doc-indexer", **fields):
         response = self.client.post(
@@ -948,3 +949,81 @@ class RuleAdminTests(TestCase):
             f"/admin/director_app/policy/{policy.id}/change/"
         )
         self.assertContains(response, "solar_power_w ≥ 1500")
+
+
+class RuleCatalogTests(OperatorTestCase):
+    def test_catalog(self):
+        response = self.client.get("/api/rules/catalog/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), catalog())
+        fields = {field["name"]: field for field in response.json()["fields"]}
+        self.assertEqual(fields["local_time"]["type"], "time")
+        self.assertTrue(fields["pv1_power_w"]["nullable"])
+        self.assertNotIn("id", fields)
+        ops = {op["op"] for op in response.json()["operators"]}
+        self.assertLessEqual({"and", "ge", "in", "div"}, ops)
+
+
+class UTCDateTimeTests(OperatorTestCase):
+    def test_model_datetimes_are_utc(self):
+        app = self.create_app()
+        self.assertTrue(app["created_at"].endswith("Z"), app["created_at"])
+        policy = self.create_policy()
+        self.assertTrue(policy["updated_at"].endswith("Z"))
+        listed = self.client.get("/api/apps/").json()["results"][0]
+        self.assertEqual(listed["created_at"], app["created_at"])
+
+    def test_evaluation_energy_is_utc(self):
+        app = self.create_app()
+        snapshot = EnergySnapshot.objects.create(
+            timestamp=timezone.now(),
+            solar_power_w=3200,
+            load_power_w=900,
+            grid_power_w=0,
+            battery_power_w=0,
+            battery_charge_pct=82,
+            battery_voltage_v=52.0,
+            grid_voltage_v=230.0,
+        )
+        energy = EnergySnapshotSchema.model_validate(snapshot)
+        with patch(
+            "src.director_app.views.read_latest_energy_and_save",
+            return_value=energy,
+        ):
+            response = self.client.get(f"/api/apps/{app['id']}/evaluate/")
+        timestamp = response.json()["energy"]["timestamp"]
+        self.assertTrue(timestamp.endswith("Z"), timestamp)
+
+
+@override_settings(CORS_ALLOWED_ORIGINS=["http://localhost:5173"])
+class CorsTests(OperatorTestCase):
+    def test_allowed_origin(self):
+        response = self.client.get(
+            "/api/rules/",
+            HTTP_ORIGIN="http://localhost:5173",
+        )
+        self.assertEqual(
+            response["Access-Control-Allow-Origin"],
+            "http://localhost:5173",
+        )
+
+    def test_preflight(self):
+        response = self.client.options(
+            "/api/rules/",
+            HTTP_ORIGIN="http://localhost:5173",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="PATCH",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("PATCH", response["Access-Control-Allow-Methods"])
+        self.assertIn(
+            "content-type",
+            response["Access-Control-Allow-Headers"],
+        )
+
+    def test_other_origin_gets_no_header(self):
+        response = self.client.get(
+            "/api/rules/",
+            HTTP_ORIGIN="http://evil.example",
+        )
+        self.assertNotIn("Access-Control-Allow-Origin", response)

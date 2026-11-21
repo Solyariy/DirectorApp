@@ -1,0 +1,23 @@
+$kind: http-request
+description: 'Open sign-up; always creates role `user` (read-only). Uses a unique username per run and stores the new id in `userId` (for the `Users` requests). Sends no token.'
+method: POST
+url: '{{baseUrl}}/auth/register/'
+order: 500
+auth:
+  type: noauth
+body:
+  type: json
+  content: |-
+    {
+      "username": "reader-{{$timestamp}}",
+      "password": "solar-panel-42"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      const user = pm.response.json();
+      pm.test('Role is user', () => pm.expect(user.role).to.eql('user'));
+      pm.collectionVariables.set('userId', user.id);
+examples: './.resources/Register.resources/examples'

@@ -19,6 +19,7 @@ from src.inverter_app.inverter_service.manager import (
 )
 from src.inverter_app.models import EnergySnapshot
 from src.inverter_app.schemas import EnergySnapshotSchema, PvSiteSchema
+from src.utils.testing import operator_client
 
 SNAPSHOT_DEFAULTS = {
     "id": None,
@@ -246,3 +247,43 @@ class ComparePvEstimateCommandTests(TestCase):
         self.assertIn("MPP reference voltages: {'pv1': 300.0}", report)
         # 3200 W available, 600 W used.
         self.assertIn("mean 2600 W", report)
+
+
+class EnergySnapshotApiTests(TestCase):
+    def setUp(self):
+        self.client = operator_client()
+        fields = dict(SNAPSHOT_DEFAULTS)
+        fields.pop("id")
+        self.body = {"timestamp": "2026-11-04T12:00:00+02:00", **fields}
+
+    def test_create_returns_utc(self):
+        response = self.client.post(
+            "/api/energy/snapshots/",
+            self.body,
+            format="json",
+        )
+        self.assertEqual(
+            response.status_code,
+            201,
+            response.data,
+        )
+        self.assertEqual(response.json()["timestamp"], "2026-11-04T10:00:00Z")
+
+    def test_naive_input_is_utc(self):
+        body = {**self.body, "timestamp": "2026-11-04T10:00:00"}
+        response = self.client.post(
+            "/api/energy/snapshots/",
+            body,
+            format="json",
+        )
+        self.assertEqual(response.json()["timestamp"], "2026-11-04T10:00:00Z")
+        listed = self.client.get(
+            "/api/energy/snapshots/",
+            {"from": "2026-11-04T10:00:00", "to": "2026-11-04T10:00:00"},
+        )
+        self.assertEqual(listed.json()["count"], 1)
+        before = self.client.get(
+            "/api/energy/snapshots/",
+            {"to": "2026-11-04T09:59:59"},
+        )
+        self.assertEqual(before.json()["count"], 0)

@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/policies/'
+  method: POST
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "operator": [
+          "\"xor\" is not a valid choice."
+        ],
+        "rules": {
+          "0": {
+            "rule": [
+              "Invalid pk \"999\" - object does not exist."
+            ]
+          }
+        }
+      }
+order: 2000

@@ -1,0 +1,21 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/apps/'
+  method: POST
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 1,
+        "name": "doc-indexer",
+        "description": "Nightly embeddings for the home wiki",
+        "policy": null,
+        "created_at": "2026-11-04T10:00:00Z"
+      }
+order: 1000

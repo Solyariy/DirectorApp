@@ -17,3 +17,4 @@ scripts:
     code: |-
       pm.test('Status is 200', () => pm.response.to.have.status(200));
       pm.test('Status updated', () => pm.expect(pm.response.json().status).to.eql('in-process'));
+examples: './.resources/Update job.resources/examples'

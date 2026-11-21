@@ -1,8 +1,21 @@
 $kind: collection
-description: "Energy-aware job director: operator API for registered apps, rules, policies and jobs (director_app, `/api/`) and inverter energy readings (inverter_app, `/api/energy/`). Run the server with `uv run python manage.py runserver`."
+description: "Energy-aware job director: operator API for registered apps, rules, policies and jobs (director_app, `/api/`) and inverter energy readings (inverter_app, `/api/energy/`). Run the server with `uv run python manage.py runserver`. The OpenAPI 3 contract for every endpoint (schemas, error shapes, conventions) is `postman/specs/director-api.yaml`; every request has saved examples captured from the real API. Auth: every request sends `Authorization: Token {{token}}` (collection auth). Run `Auth/Obtain token` first with `username` / `password` of an admin (`uv run python manage.py createsuperuser`) — it stores the key in `token`; put the password in the variable's current value only, never commit it. Role `user` (what `Auth/Register` creates) is read-only: writes, `Evaluate app`, `Get current reading` and `Users/*` answer `403`."
+auth:
+  type: apikey
+  credentials:
+    - key: key
+      value: Authorization
+    - key: value
+      value: 'Token {{token}}'
+    - key: in
+      value: header
 variables:
   baseUrl: http://127.0.0.1:8000/api
+  username: admin
+  password: ''
+  token: ''
   appId: "1"
   ruleId: "1"
   policyId: "1"
   jobId: "1"
+  userId: "2"

@@ -38,8 +38,11 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "corsheaders",
     "rest_framework",
+    "rest_framework.authtoken",
     "django_filters",
+    "src.accounts_app",
     "src.inverter_app",
     "src.director_app",
     "django.contrib.admin",
@@ -53,6 +56,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Before CommonMiddleware, so redirects and errors carry CORS headers.
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -61,6 +66,27 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+# Browser origins (scheme://host[:port]) allowed to call the API, e.g. a
+# separate frontend dev server; comma-separated in .env.
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+CORS_URLS_REGEX = r"^/api/.*$"
+
+# Every API endpoint needs a token ("Authorization: Token <key>") from
+# POST /api/auth/token/. Role admin (is_staff) may do anything, role user
+# only reads (safe methods); views override this for open/admin-only cases.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "src.utils.permissions.IsAdminOrReadOnly",
+    ],
+}
 
 TEMPLATES = [
     {

@@ -1,0 +1,40 @@
+$kind: http-example
+request:
+  url: '{{baseUrl}}/energy/snapshots/'
+  method: POST
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "timestamp": [
+          "This field is required."
+        ],
+        "solar_power_w": [
+          "A valid integer is required."
+        ],
+        "load_power_w": [
+          "This field is required."
+        ],
+        "grid_power_w": [
+          "This field is required."
+        ],
+        "battery_power_w": [
+          "This field is required."
+        ],
+        "battery_charge_pct": [
+          "This field is required."
+        ],
+        "battery_voltage_v": [
+          "This field is required."
+        ],
+        "grid_voltage_v": [
+          "This field is required."
+        ]
+      }
+order: 2000

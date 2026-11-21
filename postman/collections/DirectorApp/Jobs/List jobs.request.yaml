@@ -25,3 +25,4 @@ scripts:
         pm.expect(body).to.have.property('count');
         pm.expect(body.results).to.be.an('array');
       });
+examples: './.resources/List jobs.resources/examples'

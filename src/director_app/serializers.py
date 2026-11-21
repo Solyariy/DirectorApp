@@ -9,9 +9,10 @@ from src.director_app.models import (
     Rule,
     validate_http_url,
 )
+from src.utils.serializers import UTCModelSerializer
 
 
-class RuleSerializer(serializers.ModelSerializer):
+class RuleSerializer(UTCModelSerializer):
     class Meta:
         model = Rule
         fields = [
@@ -26,13 +27,13 @@ class RuleSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class RuleBriefSerializer(serializers.ModelSerializer):
+class RuleBriefSerializer(UTCModelSerializer):
     class Meta:
         model = Rule
         fields = ["id", "name", "is_active"]
 
 
-class PolicyRuleSerializer(serializers.ModelSerializer):
+class PolicyRuleSerializer(UTCModelSerializer):
     # Written as a rule id, read as a brief rule.
     rule = serializers.PrimaryKeyRelatedField(queryset=Rule.objects.all())
     effective = serializers.BooleanField(read_only=True)
@@ -56,7 +57,7 @@ class PolicyRuleSerializer(serializers.ModelSerializer):
         return data
 
 
-class PolicySerializer(serializers.ModelSerializer):
+class PolicySerializer(UTCModelSerializer):
     apps_count = serializers.IntegerField(read_only=True)
     # When sent, the list replaces the policy's rule links.
     rules = PolicyRuleSerializer(
@@ -118,7 +119,7 @@ class PolicySerializer(serializers.ModelSerializer):
             )
 
 
-class RegisteredAppSerializer(serializers.ModelSerializer):
+class RegisteredAppSerializer(UTCModelSerializer):
     class Meta:
         model = RegisteredApp
         fields = [
@@ -131,13 +132,13 @@ class RegisteredAppSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-class AppBriefSerializer(serializers.ModelSerializer):
+class AppBriefSerializer(UTCModelSerializer):
     class Meta:
         model = RegisteredApp
         fields = ["id", "name"]
 
 
-class JobSerializer(serializers.ModelSerializer):
+class JobSerializer(UTCModelSerializer):
     # Declared because DRF drops a model URLField's URL validators.
     data = serializers.ListField(
         child=serializers.URLField(
