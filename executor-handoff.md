@@ -15,7 +15,7 @@
 | Python / Django | `.python-version` 3.11 → Django **5.2.18**; `uv.lock` already resolves Django 6.1.2 for Python ≥3.12 |
 | REST | DRF 3.18 `APIView` classes, django-filter, pydantic DTOs in `schemas.py`, structlog `Logger` |
 | Apps | `src/director_app` (Rule, Policy, PolicyRuleRelation, RegisteredApp + app-token auth, `evaluation.py`), `src/inverter_app` (EnergySnapshot ledger, `scripts.read_latest_energy_and_save()`) |
-| Repo rules | apps in `src/<name>_app`, registered as `src.<name>_app`; tables in Postgres `apps` schema via `apps_table()`; each app owns migrations; cross-app imports only via `models`/`schemas`/`scripts`; never code in `__init__.py`; DOX AGENTS.md chain must be updated; CLAUDE.md "Facts"; scope discipline (only requested fields) |
+| Repo rules | apps in `src/<name>_app`, registered as `src.<name>_app`; tables in Postgres `apps` schema via `apps_table()`; each app owns migrations; cross-app imports only via `models`/`schemas`/`scripts`; never code in `__init__.py`; DOX AGENTS.md chain must be updated; `docs/repo-rules.md` "Facts"; scope discipline (only requested fields) |
 | API workflow | `postman/skills/api-builder/SKILL.md`: contract first, OpenAPI spec in `postman/specs/` (none yet), collection edited by hand, never Postman cloud |
 | Worker pattern | `deploy/inverter_worker/`: minimal image, own settings with one app, supercronic |
 | Compose | `db` (Postgres 17, bound to 127.0.0.1:5444), `inverter-worker` |
@@ -48,7 +48,7 @@
 - WoL must be enabled in BIOS/NIC on the PC; host needs SSH key access to the PC.
 ## 6. Next steps
  
-- [ ] Python 3.12 / Django 6.1 upgrade (separate small change).
+- [x] Python 3.12 / Django 6.1 upgrade (done 2026-11-25; Django 6.1 also needs `django.contrib.postgres` in `INSTALLED_APPS` for `Job.data` ArrayField).
 - [ ] OpenAPI spec for executor endpoints in `postman/specs/` (submit job IDs, job status/result, node status, pause/drain/cancel).
 - [ ] Define model / profile / node / job / chunk schemas (only fields the user asks for).
 - [ ] Decide webhook need for external registered apps.

@@ -12,7 +12,7 @@ What it manages:
 
 ## Quick start
 
-Requirements: Python 3.11+, [`uv`](https://docs.astral.sh/uv/), Docker.
+Requirements: Python 3.12+, [`uv`](https://docs.astral.sh/uv/), Docker.
 
 ```sh
 cp .env.example .env            # fill in DJANGO_SECRET_KEY, POSTGRES_PASSWORD, INVERTER_LOGGER_* (see Environment variables)

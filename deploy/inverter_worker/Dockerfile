@@ -2,7 +2,7 @@
 # supercronic. Build from the repo root:
 #   docker compose build inverter-worker
 
-FROM python:3.11-slim AS deps
+FROM python:3.12-slim AS deps
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /usr/local/bin/uv
 
@@ -15,7 +15,7 @@ RUN uv export --frozen --no-dev --no-hashes --no-emit-project \
         django "psycopg[binary]" pysolarmanv5 pydantic structlog dotenv
 
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 ARG TARGETARCH
 ARG SUPERCRONIC_VERSION=v0.2.49
@@ -31,8 +31,8 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
  && echo "${sum}  /usr/local/bin/supercronic" | sha1sum -c - \
  && chmod +x /usr/local/bin/supercronic
 
-COPY --from=deps /usr/local/lib/python3.11/site-packages \
-    /usr/local/lib/python3.11/site-packages
+COPY --from=deps /usr/local/lib/python3.12/site-packages \
+    /usr/local/lib/python3.12/site-packages
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
